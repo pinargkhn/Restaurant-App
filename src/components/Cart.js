@@ -2,7 +2,7 @@ import { useCart } from "../context/CartContext";
 import { submitOrder } from "../lib/orders";
 
 export default function Cart() {
-  const { items, total, increaseQty, decreaseQty, removeItem, clearCart, setLastOrderId } = useCart();
+  const { items, total, increaseQty, decreaseQty, removeItem, clearCart } = useCart();
   const tableId = new URLSearchParams(window.location.search).get("table") || "unknown";
 
   const handleConfirm = async () => {
@@ -13,10 +13,7 @@ export default function Cart() {
       const orderId = await submitOrder({ tableId, items, total });
       console.log("Sipariş eklendi ID:", orderId);
 
-      setLastOrderId(orderId);
-
-      await clearCart(); // ✅ UI + Firestore sepet temizlensin
-
+      await clearCart(); // ✅ sepet temizlenir
       alert("Sipariş alındı!");
     } catch (e) {
       console.error("Sipariş gönderilemedi:", e);
@@ -37,11 +34,26 @@ export default function Cart() {
               <li key={p.id} className="py-2 flex justify-between items-center">
                 <span className="font-medium">{p.name}</span>
                 <div className="flex items-center gap-2">
-                  <button className="px-2 py-1 bg-gray-200 rounded" onClick={() => decreaseQty(p.id)}>−</button>
+                  <button
+                    className="px-2 py-1 bg-gray-200 rounded"
+                    onClick={() => decreaseQty(p.id)}
+                  >
+                    −
+                  </button>
                   <span>{p.qty}</span>
-                  <button className="px-2 py-1 bg-gray-200 rounded" onClick={() => increaseQty(p.id)}>+</button>
+                  <button
+                    className="px-2 py-1 bg-gray-200 rounded"
+                    onClick={() => increaseQty(p.id)}
+                  >
+                    +
+                  </button>
                   <span className="font-semibold">{p.price * p.qty} ₺</span>
-                  <button className="text-red-600 ml-2" onClick={() => removeItem(p.id)}>Sil</button>
+                  <button
+                    className="text-red-600 ml-2"
+                    onClick={() => removeItem(p.id)}
+                  >
+                    Sil
+                  </button>
                 </div>
               </li>
             ))}

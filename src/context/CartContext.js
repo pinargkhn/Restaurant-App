@@ -1,89 +1,48 @@
-import { createContext, useContext, useState, useMemo, useEffect, useCallback } from "react";
-import { db, doc, setDoc, onSnapshot, serverTimestamp } from "../lib/firebase";
+import { createContext, useContext, useState, useMemo, useEffect } from "react";
+import { db } from "../lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import { updateCart } from "../lib/orders";
 
 const CartContext = createContext();
 
 export function CartProvider({ children }) {
-  const tableId = new URLSearchParams(window.location.search).get("table") || "unknown";
+  const tableId = new URLSearchParams(window.location.search).get("table") || "masa_1";
   const [items, setItems] = useState([]);
-  const [lastOrderId, setLastOrderId] = useState(null);
 
-  // Firestore'dan sepet oku
+  // Firestore’daki cart alanını dinle
   useEffect(() => {
-    const ref = doc(db, "carts", tableId);
+    const ref = doc(db, "tables", tableId);
     const unsub = onSnapshot(ref, (snap) => {
-      if (snap.exists()) {
-        setItems(snap.data().items || []);
+      if (snap.exists() && snap.data().cart) {
+        setItems(snap.data().cart.items || []);
       }
     });
     return () => unsub();
   }, [tableId]);
 
-  // Firestore'a yazma
-  const syncCart = async (newItems) => {
-    const ref = doc(db, "carts", tableId);
-    await setDoc(ref, { items: newItems, updatedAt: serverTimestamp() }, { merge: true });
+  const syncCart = (newItems) => {
+    const total = newItems.reduce((sum, p) => sum + p.price * p.qty, 0);
+    setItems(newItems);
+    updateCart(tableId, newItems, total);
   };
 
   const addItem = (product) => {
-    setItems((prev) => {
-      const existing = prev.find((p) => p.id === product.id);
-      const newItems = existing
-        ? prev.map((p) => (p.id === product.id ? { ...p, qty: p.qty + 1 } : p))
-        : [...prev, { ...product, qty: 1 }];
-      syncCart(newItems);
-      return newItems;
-    });
+    const existing = items.find((p) => p.id === product.id);
+    const newItems = existing
+      ? items.map((p) => p.id === product.id ? { ...p, qty: p.qty + 1 } : p)
+      : [...items, { ...product, qty: 1 }];
+    syncCart(newItems);
   };
 
-  const increaseQty = (id) => {
-    setItems((prev) => {
-      const newItems = prev.map((p) => (p.id === id ? { ...p, qty: p.qty + 1 } : p));
-      syncCart(newItems);
-      return newItems;
-    });
-  };
-
-  const decreaseQty = (id) => {
-    setItems((prev) => {
-      const newItems = prev
-        .map((p) => (p.id === id ? { ...p, qty: p.qty - 1 } : p))
-        .filter((p) => p.qty > 0);
-      syncCart(newItems);
-      return newItems;
-    });
-  };
-
-  const removeItem = (id) => {
-    setItems((prev) => {
-      const newItems = prev.filter((p) => p.id !== id);
-      syncCart(newItems);
-      return newItems;
-    });
-  };
-
-  const clearCart = useCallback(async () => {
-    setItems([]); // UI anında boşalsın
-    const ref = doc(db, "carts", tableId);
-    await setDoc(ref, { items: [], updatedAt: serverTimestamp() }, { merge: true });
-  }, [tableId]);
+  const increaseQty = (id) => syncCart(items.map((p) => (p.id === id ? { ...p, qty: p.qty + 1 } : p)));
+  const decreaseQty = (id) => syncCart(items.map((p) => (p.id === id ? { ...p, qty: p.qty - 1 } : p)).filter((p) => p.qty > 0));
+  const removeItem = (id) => syncCart(items.filter((p) => p.id !== id));
+  const clearCart = () => syncCart([]);
 
   const total = useMemo(() => items.reduce((sum, p) => sum + p.price * p.qty, 0), [items]);
 
   return (
-    <CartContext.Provider
-      value={{
-        items,
-        addItem,
-        increaseQty,
-        decreaseQty,
-        removeItem,
-        clearCart,
-        total,
-        lastOrderId,
-        setLastOrderId,
-      }}
-    >
+    <CartContext.Provider value={{ items, addItem, increaseQty, decreaseQty, removeItem, clearCart, total, tableId }}>
       {children}
     </CartContext.Provider>
   );
