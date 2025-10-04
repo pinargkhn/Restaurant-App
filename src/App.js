@@ -5,7 +5,7 @@ import Waiter from "./pages/Waiter";
 import QRAdmin from "./pages/QRAdmin";
 import Login from "./pages/Login";
 import { CartProvider } from "./context/CartContext";
-
+import AdminDashboard from "./pages/AdminDashboard";
 
 // 🔹 Yetkili kullanıcı kontrolü (rol bazlı koruma)
 function PrivateRoute({ children, allowedRole }) {
@@ -52,9 +52,18 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute allowedRole="admin">
+              <AdminDashboard />
+            </PrivateRoute>
+           }
+         />
       </Routes>
     </CartProvider>
   );
 }
 
 export default App;
+

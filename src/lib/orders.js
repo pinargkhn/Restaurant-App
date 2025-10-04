@@ -1,5 +1,13 @@
 import { db } from "./firebase";
-import { doc, setDoc, addDoc, collection, deleteDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  addDoc,
+  collection,
+  deleteDoc,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 
 // 🔹 Yeni sipariş ekle (masa altındaki orders subcollection’a)
 export async function submitOrder({ tableId, items, total }) {
@@ -10,6 +18,7 @@ export async function submitOrder({ tableId, items, total }) {
     total,
     status: "Yeni",
     createdAt: serverTimestamp(),
+    tableId, // 🔹 admin panelde kolay takip için ekledik
   };
 
   const ref = collection(db, "tables", tableId, "orders");
@@ -17,6 +26,7 @@ export async function submitOrder({ tableId, items, total }) {
 
   console.log("✅ Firestore’a yazıldı:", docRef.id);
 
+  // 🔹 Sepeti sıfırla
   await setDoc(
     doc(db, "tables", tableId),
     { cart: { items: [], total: 0 } },
@@ -26,11 +36,17 @@ export async function submitOrder({ tableId, items, total }) {
   return docRef.id;
 }
 
-
-// 🔹 Sipariş durumunu güncelle
+// 🔹 Sipariş durumunu güncelle (Hazır olduğunda readyAt ekle)
 export async function updateOrderStatus(tableId, orderId, status) {
   const ref = doc(db, "tables", tableId, "orders", orderId);
-  await setDoc(ref, { status }, { merge: true });
+
+  // 🔹 Eğer sipariş “Hazır” yapılıyorsa readyAt timestamp’ini ekle
+  const updateData = { status };
+  if (status === "Hazır") {
+    updateData.readyAt = serverTimestamp();
+  }
+
+  await updateDoc(ref, updateData);
 }
 
 // 🔹 Siparişi geçmişe taşı

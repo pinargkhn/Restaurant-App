@@ -27,7 +27,7 @@ export default function Login() {
       localStorage.setItem("role", role);
 
       // 🔹 Rolüne göre yönlendir
-      if (role === "admin") navigate("/qr");
+      if (role === "admin") navigate("/dashboard");
       else if (role === "kitchen") navigate("/kitchen");
       else if (role === "waiter") navigate("/waiter");
       else setError("Yetkisiz kullanıcı.");
