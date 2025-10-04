@@ -2,12 +2,11 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Menu from "./components/Menu";
 import Kitchen from "./pages/Kitchen";
 import Waiter from "./pages/Waiter";
-import QRAdmin from "./pages/QRAdmin";
 import Login from "./pages/Login";
 import { CartProvider } from "./context/CartContext";
 import AdminDashboard from "./pages/AdminDashboard";
 
-// 🔹 Yetkili kullanıcı kontrolü (rol bazlı koruma)
+// 🔹 Rol tabanlı koruma
 function PrivateRoute({ children, allowedRole }) {
   const role = localStorage.getItem("role");
   return role === allowedRole ? children : <Navigate to="/login" />;
@@ -17,13 +16,13 @@ function App() {
   return (
     <CartProvider>
       <Routes>
-        {/* 🔸 Müşteri (QR ile masa bağlantılı giriş) */}
+        {/* 🧾 Müşteri (QR üzerinden masa bağlantılı menü) */}
         <Route path="/" element={<Menu />} />
 
-        {/* 🔸 Giriş ekranı */}
+        {/* 🔐 Giriş ekranı */}
         <Route path="/login" element={<Login />} />
 
-        {/* 🔸 Mutfak (sadece "kitchen" rolü) */}
+        {/* 👨‍🍳 Mutfak (sadece kitchen rolü) */}
         <Route
           path="/kitchen"
           element={
@@ -33,7 +32,7 @@ function App() {
           }
         />
 
-        {/* 🔸 Garson (sadece "waiter" rolü) */}
+        {/* 🧑‍💼 Garson (sadece waiter rolü) */}
         <Route
           path="/waiter"
           element={
@@ -43,27 +42,21 @@ function App() {
           }
         />
 
-        {/* 🔸 Admin (sadece "admin" rolü) */}
-        <Route
-          path="/qr"
-          element={
-            <PrivateRoute allowedRole="admin">
-              <QRAdmin />
-            </PrivateRoute>
-          }
-        />
+        {/* 🧑‍💻 Yönetici Paneli (dashboard + masa & qr yönetimi entegre) */}
         <Route
           path="/dashboard"
           element={
             <PrivateRoute allowedRole="admin">
               <AdminDashboard />
             </PrivateRoute>
-           }
-         />
+          }
+        />
+
+        {/* 🔁 Bilinmeyen URL’lerde login’e yönlendirme */}
+        <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </CartProvider>
   );
 }
 
 export default App;
-
