@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { QRCodeCanvas } from "qrcode.react";  // ✅ Canvas export kullanıyoruz
+import { QRCodeCanvas } from "qrcode.react"; // ✅ named import
 
 export default function QRAdmin() {
   const [tableId, setTableId] = useState("");
 
-  const baseUrl = window.location.origin; // örn: https://myapp.vercel.app
+  const baseUrl = window.location.origin;
   const qrUrl = `${baseUrl}/?table=${tableId}`;
 
   return (
@@ -21,7 +21,8 @@ export default function QRAdmin() {
 
       {tableId && (
         <div className="flex flex-col items-center gap-4">
-          <QRCodeCanvas value={qrUrl} size={200} />   {/* ✅ */}
+          {/* 🔹 Canvas tabanlı QR bileşeni */}
+          <QRCodeCanvas value={qrUrl} size={200} /> 
           <p className="text-gray-700">URL: {qrUrl}</p>
         </div>
       )}

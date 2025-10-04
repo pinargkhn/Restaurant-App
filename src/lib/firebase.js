@@ -1,3 +1,5 @@
+// ✅ Firebase yapılandırması (Auth + Firestore dahil)
+
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
@@ -6,14 +8,15 @@ import {
   collection,
   updateDoc,
   doc,
-  setDoc,        // ✅ kullanılıyor (CartContext’te)
+  setDoc,
   onSnapshot,
   query,
   orderBy,
   where,
 } from "firebase/firestore";
+import { getAuth } from "firebase/auth"; // 🔹 Authentication eklendi
 
-// ✅ .env dosyandaki değerler
+// 🔐 .env dosyandaki Firebase bilgilerini kullan
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_API_KEY,
   authDomain: process.env.REACT_APP_AUTH_DOMAIN,
@@ -23,11 +26,12 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_APP_ID,
 };
 
-// Firebase initialize
+// 🔹 Firebase başlat
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app); // 🔹 Auth sistemini dışa aktar
 
-// Yardımcı exportlar
+// 🔹 Firestore fonksiyonlarını export et
 export {
   serverTimestamp,
   addDoc,

@@ -1,28 +1,58 @@
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Menu from "./components/Menu";
 import Kitchen from "./pages/Kitchen";
 import Waiter from "./pages/Waiter";
-import QRAdmin from "./pages/QRAdmin";   // ✅ QR sayfası eklendi
+import QRAdmin from "./pages/QRAdmin";
+import Login from "./pages/Login";
 import { CartProvider } from "./context/CartContext";
+
+
+// 🔹 Yetkili kullanıcı kontrolü (rol bazlı koruma)
+function PrivateRoute({ children, allowedRole }) {
+  const role = localStorage.getItem("role");
+  return role === allowedRole ? children : <Navigate to="/login" />;
+}
 
 function App() {
   return (
     <CartProvider>
-      <div className="min-h-screen bg-gray-100">
-        <nav className="bg-white shadow p-4 flex gap-4">
-          <Link className="text-blue-600" to="/">Müşteri (Menü)</Link>
-          <Link className="text-blue-600" to="/kitchen">Mutfak</Link>
-          <Link className="text-blue-600" to="/waiter">Garson</Link>
-          <Link className="text-blue-600" to="/qr">QR Kod Yönetimi</Link> {/* ✅ yeni */}
-        </nav>
+      <Routes>
+        {/* 🔸 Müşteri (QR ile masa bağlantılı giriş) */}
+        <Route path="/" element={<Menu />} />
 
-        <Routes>
-          <Route path="/" element={<Menu />} />
-          <Route path="/kitchen" element={<Kitchen />} />
-          <Route path="/waiter" element={<Waiter />} />
-          <Route path="/qr" element={<QRAdmin />} /> {/* ✅ yeni */}
-        </Routes>
-      </div>
+        {/* 🔸 Giriş ekranı */}
+        <Route path="/login" element={<Login />} />
+
+        {/* 🔸 Mutfak (sadece "kitchen" rolü) */}
+        <Route
+          path="/kitchen"
+          element={
+            <PrivateRoute allowedRole="kitchen">
+              <Kitchen />
+            </PrivateRoute>
+          }
+        />
+
+        {/* 🔸 Garson (sadece "waiter" rolü) */}
+        <Route
+          path="/waiter"
+          element={
+            <PrivateRoute allowedRole="waiter">
+              <Waiter />
+            </PrivateRoute>
+          }
+        />
+
+        {/* 🔸 Admin (sadece "admin" rolü) */}
+        <Route
+          path="/qr"
+          element={
+            <PrivateRoute allowedRole="admin">
+              <QRAdmin />
+            </PrivateRoute>
+          }
+        />
+      </Routes>
     </CartProvider>
   );
 }
