@@ -42,7 +42,7 @@ function App() {
           }
         />
 
-        {/* 🧑‍💻 Yönetici Paneli (dashboard + masa & qr yönetimi entegre) */}
+        {/* Yönetici Paneli (dashboard + masa & qr yönetimi entegre) */}
         <Route
           path="/dashboard"
           element={

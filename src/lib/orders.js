@@ -7,32 +7,61 @@ import {
   deleteDoc,
   serverTimestamp,
   updateDoc,
+  getDocs, // 🔹 aktif sipariş kontrolü için eklendi
 } from "firebase/firestore";
 
-// 🔹 Yeni sipariş ekle (masa altındaki orders subcollection’a)
+// 🔹 Yeni sipariş oluşturma veya mevcut siparişi güncelleme
 export async function submitOrder({ tableId, items, total }) {
   console.log("🔥 submitOrder çağrıldı:", { tableId, items, total });
 
+  const ordersRef = collection(db, "tables", tableId, "orders");
+  const activeOrdersSnap = await getDocs(ordersRef);
+
+  // 🔸 Teslim edilmemiş siparişi bul
+  const existingOrderDoc = activeOrdersSnap.docs.find(
+    (d) => d.data().status !== "Teslim Edildi"
+  );
+
+  if (existingOrderDoc) {
+    console.log("♻️ Aktif sipariş bulundu, mevcut sipariş güncelleniyor...");
+    const existing = existingOrderDoc.data();
+    const mergedItems = [...existing.items];
+
+    // 🔸 Aynı üründen varsa miktar artır, yoksa yeni ekle
+    items.forEach((newItem) => {
+      const idx = mergedItems.findIndex((i) => i.id === newItem.id);
+      if (idx >= 0) mergedItems[idx].qty += newItem.qty || 1;
+      else mergedItems.push(newItem);
+    });
+
+    const newTotal = mergedItems.reduce(
+      (sum, p) => sum + p.price * p.qty,
+      0
+    );
+
+    await updateDoc(existingOrderDoc.ref, {
+      items: mergedItems,
+      total: newTotal,
+      updatedAt: serverTimestamp(),
+      newItemsAdded: true, // ⚠️ mutfak ve garson için uyarı göstergesi
+    });
+
+    console.log("✅ Mevcut sipariş güncellendi:", existingOrderDoc.id);
+    return existingOrderDoc.id;
+  }
+
+  // 🆕 Yeni sipariş oluştur
   const orderData = {
     items,
     total,
     status: "Yeni",
     createdAt: serverTimestamp(),
-    tableId, // 🔹 admin panelde kolay takip için ekledik
+    tableId,
+    newItemsAdded: false,
   };
 
-  const ref = collection(db, "tables", tableId, "orders");
-  const docRef = await addDoc(ref, orderData);
-
-  console.log("✅ Firestore’a yazıldı:", docRef.id);
-
-  // 🔹 Sepeti sıfırla
-  await setDoc(
-    doc(db, "tables", tableId),
-    { cart: { items: [], total: 0 } },
-    { merge: true }
-  );
-
+  const docRef = await addDoc(ordersRef, orderData);
+  console.log("✅ Yeni sipariş oluşturuldu:", docRef.id);
   return docRef.id;
 }
 
@@ -40,11 +69,13 @@ export async function submitOrder({ tableId, items, total }) {
 export async function updateOrderStatus(tableId, orderId, status) {
   const ref = doc(db, "tables", tableId, "orders", orderId);
 
-  // 🔹 Eğer sipariş “Hazır” yapılıyorsa readyAt timestamp’ini ekle
   const updateData = { status };
   if (status === "Hazır") {
     updateData.readyAt = serverTimestamp();
   }
+
+  // Durum değiştiğinde uyarı sıfırlansın
+  updateData.newItemsAdded = false;
 
   await updateDoc(ref, updateData);
 }

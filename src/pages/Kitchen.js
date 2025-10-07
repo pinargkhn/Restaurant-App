@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { db, collection, onSnapshot } from "../lib/firebase";
+import { db, collection, onSnapshot, doc, updateDoc } from "../lib/firebase";
 import { updateOrderStatus } from "../lib/orders";
 
 export default function Kitchen() {
@@ -52,9 +52,20 @@ export default function Kitchen() {
     }
   };
 
+  const handleStatusChange = async (tableId, orderId, status) => {
+    try {
+      await updateOrderStatus(tableId, orderId, status);
+      await updateDoc(doc(db, "tables", tableId, "orders", orderId), {
+        newItemsAdded: false,
+      });
+    } catch (err) {
+      console.error("Durum güncelleme hatası:", err);
+    }
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Mutfak Paneli</h2>
+      <h2 className="text-2xl font-bold mb-4">🍳 Mutfak Paneli</h2>
 
       {!orders.length && <p className="text-gray-500">Henüz sipariş yok.</p>}
 
@@ -68,8 +79,17 @@ export default function Kitchen() {
               className={`rounded shadow p-4 ${getBgColor(o.status)}`}
             >
               <div className="flex justify-between items-center">
-                <span className="font-semibold">Masa: {o.tableId}</span>
-                <span className="text-sm px-2 py-1 rounded bg-gray-100">{o.status}</span>
+                <span className="font-semibold">
+                  Masa: {o.tableId}
+                  {o.newItemsAdded && (
+                    <span className="ml-2 text-red-600 font-semibold animate-pulse">
+                      ⚠️ Yeni ürün eklendi
+                    </span>
+                  )}
+                </span>
+                <span className="text-sm px-2 py-1 rounded bg-gray-100">
+                  {o.status}
+                </span>
               </div>
 
               <ul className="mt-2 list-disc ml-6 text-gray-700 text-sm">
@@ -82,14 +102,16 @@ export default function Kitchen() {
 
               <div className="mt-3 flex gap-2">
                 <button
-                  className="px-3 py-1 bg-yellow-600 text-white rounded"
-                  onClick={() => updateOrderStatus(o.tableId, o.id, "Hazırlanıyor")}
+                  className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                  onClick={() =>
+                    handleStatusChange(o.tableId, o.id, "Hazırlanıyor")
+                  }
                 >
                   Hazırlanıyor
                 </button>
                 <button
-                  className="px-3 py-1 bg-green-700 text-white rounded"
-                  onClick={() => updateOrderStatus(o.tableId, o.id, "Hazır")}
+                  className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800"
+                  onClick={() => handleStatusChange(o.tableId, o.id, "Hazır")}
                 >
                   Hazır
                 </button>
