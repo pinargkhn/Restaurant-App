@@ -1,3 +1,4 @@
+// src/lib/orders.js
 import { db } from "./firebase";
 import {
   doc,
@@ -7,27 +8,25 @@ import {
   deleteDoc,
   serverTimestamp,
   updateDoc,
-  getDocs, // 🔹 aktif sipariş kontrolü için eklendi
+  getDocs,
 } from "firebase/firestore";
 
-// 🔹 Yeni sipariş oluşturma veya mevcut siparişi güncelleme
+// 🔹 Yeni sipariş oluştur veya mevcutu güncelle
 export async function submitOrder({ tableId, items, total }) {
   console.log("🔥 submitOrder çağrıldı:", { tableId, items, total });
 
   const ordersRef = collection(db, "tables", tableId, "orders");
   const activeOrdersSnap = await getDocs(ordersRef);
 
-  // 🔸 Teslim edilmemiş siparişi bul
   const existingOrderDoc = activeOrdersSnap.docs.find(
     (d) => d.data().status !== "Teslim Edildi"
   );
 
   if (existingOrderDoc) {
-    console.log("♻️ Aktif sipariş bulundu, mevcut sipariş güncelleniyor...");
+    console.log("♻️ Aktif sipariş bulundu, güncelleniyor...");
     const existing = existingOrderDoc.data();
     const mergedItems = [...existing.items];
 
-    // 🔸 Aynı üründen varsa miktar artır, yoksa yeni ekle
     items.forEach((newItem) => {
       const idx = mergedItems.findIndex((i) => i.id === newItem.id);
       if (idx >= 0) mergedItems[idx].qty += newItem.qty || 1;
@@ -43,14 +42,12 @@ export async function submitOrder({ tableId, items, total }) {
       items: mergedItems,
       total: newTotal,
       updatedAt: serverTimestamp(),
-      newItemsAdded: true, // ⚠️ mutfak ve garson için uyarı göstergesi
+      newItemsAdded: true,
     });
 
-    console.log("✅ Mevcut sipariş güncellendi:", existingOrderDoc.id);
     return existingOrderDoc.id;
   }
 
-  // 🆕 Yeni sipariş oluştur
   const orderData = {
     items,
     total,
@@ -65,18 +62,12 @@ export async function submitOrder({ tableId, items, total }) {
   return docRef.id;
 }
 
-// 🔹 Sipariş durumunu güncelle (Hazır olduğunda readyAt ekle)
+// 🔹 Sipariş durumu güncelle
 export async function updateOrderStatus(tableId, orderId, status) {
   const ref = doc(db, "tables", tableId, "orders", orderId);
-
   const updateData = { status };
-  if (status === "Hazır") {
-    updateData.readyAt = serverTimestamp();
-  }
-
-  // Durum değiştiğinde uyarı sıfırlansın
+  if (status === "Hazır") updateData.readyAt = serverTimestamp();
   updateData.newItemsAdded = false;
-
   await updateDoc(ref, updateData);
 }
 
@@ -91,4 +82,32 @@ export async function moveToPastOrders(tableId, orderId, orderData) {
 export async function updateCart(tableId, items, total) {
   const ref = doc(db, "tables", tableId);
   await setDoc(ref, { cart: { items, total } }, { merge: true });
+}
+
+// 🔹 QR ödeme başlat (Stripe Checkout örneği)
+export async function startQrPayment({ tableId, orderId, amount, waiterUid }) {
+  const res = await fetch("/api/create-checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tableId, orderId, amount, waiterUid }),
+  });
+  if (!res.ok) throw new Error("Ödeme oturumu oluşturulamadı");
+
+  const data = await res.json(); // { url, sessionId, provider }
+  const ref = doc(db, "tables", tableId, "orders", orderId);
+  await updateDoc(ref, {
+    payment: {
+      status: "pending",
+      method: "qr",
+      provider: data.provider || "stripe",
+      sessionId: data.sessionId || null,
+      amount,
+      currency: "TRY",
+      collectedBy: waiterUid || null,
+      transactionId: null,
+      paidAt: null,
+    },
+    updatedAt: serverTimestamp(),
+  });
+  return data;
 }
