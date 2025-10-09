@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
@@ -20,8 +21,8 @@ export default async function handler(req, res) {
         },
       ],
       mode: "payment",
-      success_url: `${process.env.ORIGIN}/payment-success?order=${orderId}`,
-      cancel_url: `${process.env.ORIGIN}/payment-cancel?order=${orderId}`,
+      success_url: `${process.env.ORIGIN}?success=true`,
+      cancel_url: `${process.env.ORIGIN}?canceled=true`,
       metadata: { tableId, orderId, waiterUid },
     });
 

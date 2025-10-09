@@ -1,9 +1,14 @@
 import Stripe from "stripe";
-import { initializeApp, cert } from "firebase-admin/app";
+import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
+
+if (!getApps().length) {
+  initializeApp({
+    credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
+  });
+}
 const db = getFirestore();
 
 export const config = { api: { bodyParser: false } };
@@ -34,24 +39,29 @@ export default async function handler(req, res) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     const { orderId, tableId, waiterUid } = session.metadata || {};
+
     if (orderId && tableId) {
       const ref = db.collection("tables").doc(tableId).collection("orders").doc(orderId);
-      await ref.update({
-        payment: {
-          status: "paid",
-          method: "qr",
-          provider: "stripe",
-          sessionId: session.id,
-          transactionId: session.payment_intent || null,
-          amount: session.amount_total / 100,
-          currency: session.currency.toUpperCase(),
-          collectedBy: waiterUid || null,
-          paidAt: new Date(),
-        },
-        updatedAt: new Date(),
-      });
+      try {
+        await ref.update({
+          payment: {
+            status: "paid",
+            method: "qr",
+            provider: "stripe",
+            sessionId: session.id,
+            transactionId: session.payment_intent || null,
+            amount: session.amount_total / 100,
+            currency: session.currency.toUpperCase(),
+            collectedBy: waiterUid || null,
+            paidAt: new Date().toISOString(),
+          },
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.error("🔥 Firestore update failed:", err);
+      }
     }
   }
 
-  res.json({ received: true });
+  return res.status(200).json({ received: true });
 }

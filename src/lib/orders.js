@@ -84,16 +84,20 @@ export async function updateCart(tableId, items, total) {
   await setDoc(ref, { cart: { items, total } }, { merge: true });
 }
 
-// 🔹 QR ödeme başlat (Stripe Checkout örneği)
+// 🔹 QR ödeme başlat (Render backend’ine yönlendirildi)
 export async function startQrPayment({ tableId, orderId, amount, waiterUid }) {
-  const res = await fetch("/api/create-checkout", {
+  const API_BASE = "https://stripe-backend-xxxxx.onrender.com"; // 🔹 kendi Render URL’inle değiştir
+
+  const res = await fetch(`${API_BASE}/create-checkout`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tableId, orderId, amount, waiterUid }),
   });
+
   if (!res.ok) throw new Error("Ödeme oturumu oluşturulamadı");
 
   const data = await res.json(); // { url, sessionId, provider }
+
   const ref = doc(db, "tables", tableId, "orders", orderId);
   await updateDoc(ref, {
     payment: {
@@ -109,5 +113,6 @@ export async function startQrPayment({ tableId, orderId, amount, waiterUid }) {
     },
     updatedAt: serverTimestamp(),
   });
+
   return data;
 }
