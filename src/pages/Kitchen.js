@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { db, collection, onSnapshot, doc, updateDoc } from "../lib/firebase";
-import { updateOrderStatus } from "../lib/orders";
 
 export default function Kitchen() {
   const [orders, setOrders] = useState([]);
@@ -10,23 +9,18 @@ export default function Kitchen() {
     const unsubscribeTables = onSnapshot(tablesRef, (tablesSnap) => {
       const unsubscribers = [];
 
-      // Her tabloyu dinle
       tablesSnap.forEach((tableDoc) => {
         const tableId = tableDoc.id;
         const ordersRef = collection(db, "tables", tableId, "orders");
 
         const unsub = onSnapshot(ordersRef, (ordersSnap) => {
-          setOrders((prevOrders) => {
-            // Önce bu masaya ait eski siparişleri temizle
-            const filtered = prevOrders.filter((o) => o.tableId !== tableId);
-
-            // Yeni snapshot'tan gelen siparişleri ekle
+          setOrders((prev) => {
+            const filtered = prev.filter((o) => o.tableId !== tableId);
             const newOrders = ordersSnap.docs.map((d) => ({
               id: d.id,
               tableId,
               ...d.data(),
             }));
-
             return [...filtered, ...newOrders];
           });
         });
@@ -34,7 +28,6 @@ export default function Kitchen() {
         unsubscribers.push(unsub);
       });
 
-      // cleanup
       return () => unsubscribers.forEach((u) => u());
     });
 
@@ -52,14 +45,37 @@ export default function Kitchen() {
     }
   };
 
-  const handleStatusChange = async (tableId, orderId, status) => {
+  // 🔹 Sipariş durumunu güncelleme
+  const handleStatusChange = async (order, newStatus) => {
+    if (!order.tableId || !order.id) {
+      console.error("❌ order.tableId veya order.id eksik:", order);
+      return;
+    }
+
     try {
-      await updateOrderStatus(tableId, orderId, status);
-      await updateDoc(doc(db, "tables", tableId, "orders", orderId), {
-        newItemsAdded: false,
-      });
+      const ref = doc(db, "tables", order.tableId, "orders", order.id);
+
+      // 🔥 Hazırlanıyor: startCookingAt eklenecek
+      if (newStatus === "Hazırlanıyor") {
+        await updateDoc(ref, {
+          status: newStatus,
+          startCookingAt: new Date(),
+        });
+      }
+      // 🔥 Hazır: readyAt eklenecek
+      else if (newStatus === "Hazır") {
+        await updateDoc(ref, {
+          status: newStatus,
+          readyAt: new Date(),
+        });
+      } else {
+        await updateDoc(ref, { status: newStatus });
+      }
+
+      alert(`✅ ${order.tableId} masası '${newStatus}' olarak işaretlendi.`);
     } catch (err) {
-      console.error("Durum güncelleme hatası:", err);
+      console.error("❌ Firestore güncelleme hatası:", err);
+      alert("Güncelleme hatası oluştu. Console'u kontrol et.");
     }
   };
 
@@ -72,7 +88,9 @@ export default function Kitchen() {
       <ul className="space-y-4">
         {orders
           .filter((o) => o.status !== "Teslim Edildi")
-          .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+          .sort(
+            (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+          )
           .map((o) => (
             <li
               key={`${o.tableId}-${o.id}`}
@@ -103,17 +121,15 @@ export default function Kitchen() {
               <div className="mt-3 flex gap-2">
                 <button
                   className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-                  onClick={() =>
-                    handleStatusChange(o.tableId, o.id, "Hazırlanıyor")
-                  }
+                  onClick={() => handleStatusChange(o, "Hazırlanıyor")}
                 >
-                  Hazırlanıyor
+                  👨‍🍳 Hazırlanıyor
                 </button>
                 <button
                   className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800"
-                  onClick={() => handleStatusChange(o.tableId, o.id, "Hazır")}
+                  onClick={() => handleStatusChange(o, "Hazır")}
                 >
-                  Hazır
+                  ✅ Hazır
                 </button>
               </div>
             </li>

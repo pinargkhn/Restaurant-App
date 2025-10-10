@@ -1,20 +1,34 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { db, collection, onSnapshot, doc, updateDoc, getDoc } from "../lib/firebase";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  db,
+  collection,
+  collectionGroup,
+  onSnapshot,
+  doc,
+  updateDoc,
+  getDoc,
+} from "../lib/firebase";
 import { submitOrder, updateOrderStatus, moveToPastOrders } from "../lib/orders";
 
 function Waiter() {
-  const [orders, setOrders] = useState([]);
-  const [showDelivered, setShowDelivered] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editOrder, setEditOrder] = useState(null);
-  const [editCart, setEditCart] = useState([]);
+  // ---------------- STATE ----------------
+  const [orders, setOrders] = useState([]);             // tables/*/orders (aktif + teslim edilen)
+  const [pastPaid, setPastPaid] = useState([]);         // */pastOrders (ödenenler)
+  const [activeTab, setActiveTab] = useState("active"); // active | delivered | paid
+
+  const [showModal, setShowModal] = useState(false);           // Yeni Sipariş
   const [cart, setCart] = useState([]);
   const [tableIdInput, setTableIdInput] = useState("");
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+
+  const [showEditModal, setShowEditModal] = useState(false);   // Düzenle
+  const [editOrder, setEditOrder] = useState(null);
+  const [editCart, setEditCart] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [showPaymentModal, setShowPaymentModal] = useState(false); // Ödeme
+  const [selectedOrder, setSelectedOrder] = useState(null);
+
+  // ---------------- STATIC PRODUCTS ----------------
   const products = useMemo(
     () => [
       { id: 1, name: "Pizza", price: 120 },
@@ -25,11 +39,11 @@ function Waiter() {
     ],
     []
   );
-
   const total = (arr) => arr.reduce((s, p) => s + p.price * p.qty, 0);
 
-  // 🔹 Firestore siparişleri dinle
+  // ---------------- FIRESTORE LISTENERS ----------------
   useEffect(() => {
+    // tables/*/orders dinle
     const tablesRef = collection(db, "tables");
     const unsubTables = onSnapshot(tablesRef, (tablesSnap) => {
       const unsubscribers = [];
@@ -54,18 +68,42 @@ function Waiter() {
     return () => unsubTables();
   }, []);
 
-  // 🔹 Siparişleri filtrele
-  const now = new Date();
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const filteredActiveOrders = orders.filter((o) => o.status !== "Teslim Edildi");
-  const filteredDeliveredOrders = orders.filter((o) => {
-    if (o.status !== "Teslim Edildi") return false;
-    const ts = o.deliveredAt?.seconds
-      ? new Date(o.deliveredAt.seconds * 1000)
-      : o.deliveredAt || o.updatedAt || o.createdAt;
-    return ts && new Date(ts) > twentyFourHoursAgo;
-  });
-  const filteredList = showDelivered ? filteredDeliveredOrders : filteredActiveOrders;
+  useEffect(() => {
+    // tüm pastOrders (ödenenler) dinle
+    const unsubPast = onSnapshot(collectionGroup(db, "pastOrders"), (snap) => {
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setPastPaid(data || []);
+    });
+    return () => unsubPast();
+  }, []);
+
+  // ---------------- FILTERS ----------------
+  const activeOrders = useMemo(
+    () => orders.filter((o) => o.status !== "Teslim Edildi" && o.paymentStatus !== "Alındı"),
+    [orders]
+  );
+
+  const deliveredOrders = useMemo(
+    () => orders.filter((o) => o.status === "Teslim Edildi" && o.paymentStatus !== "Alındı"),
+    [orders]
+  );
+
+  const paidOrders = useMemo(() => {
+    // hem tables/*/orders içinden yanlışlıkla kalan "Alındı" olanlar, hem de pastOrders
+    const fromCurrent = orders.filter((o) => o.paymentStatus === "Alındı");
+    const fromPast = pastPaid.filter((o) => o.paymentStatus === "Alındı");
+    const all = [...fromPast, ...fromCurrent];
+    return all.sort(
+      (a, b) => (b.paymentAt?.seconds || 0) - (a.paymentAt?.seconds || 0)
+    );
+  }, [orders, pastPaid]);
+
+  const listForTab =
+    activeTab === "active"
+      ? activeOrders
+      : activeTab === "delivered"
+      ? deliveredOrders
+      : paidOrders;
 
   const getBgColor = (s) =>
     s === "Hazır"
@@ -76,7 +114,64 @@ function Waiter() {
       ? "bg-blue-100"
       : "bg-white";
 
-  // 🔹 Yeni sipariş işlemleri
+  // ---------------- ACTIONS: ACTIVE ----------------
+  const openEditModal = (order) => {
+    setEditOrder(order);
+    setEditCart(order.items || []);
+    setShowEditModal(true);
+  };
+
+  const handleDelivered = async (o) => {
+    try {
+      await updateOrderStatus(o.tableId, o.id, "Teslim Edildi");
+      await updateDoc(doc(db, "tables", o.tableId, "orders", o.id), {
+        deliveredAt: new Date(),
+      });
+      // Aktif listeden kaybolup "Teslim Edilenler" sekmesine düşer
+    } catch (e) {
+      console.error(e);
+      alert("❌ Güncelleme başarısız");
+    }
+  };
+
+  // ---------------- ACTIONS: PAYMENT ----------------
+  const openPayment = (order) => {
+    setSelectedOrder(order);
+    setShowPaymentModal(true);
+  };
+
+  const confirmPayment = async (method) => {
+    if (!selectedOrder) return;
+    try {
+      const { tableId, id } = selectedOrder;
+      const ref = doc(db, "tables", tableId, "orders", id);
+
+      // tables/*/orders içine ödeme bilgisi yaz
+      await updateDoc(ref, {
+        paymentStatus: "Alındı",
+        paymentMethod: method,
+        paymentAt: new Date(),
+      });
+
+      // pastOrders'a taşı
+      await moveToPastOrders(tableId, id, {
+        ...selectedOrder,
+        paymentStatus: "Alındı",
+        paymentMethod: method,
+        paymentAt: new Date(),
+      });
+
+      alert(`✅ ${method} ile ödeme alındı!`);
+    } catch (e) {
+      console.error(e);
+      alert("❌ Ödeme kaydedilemedi");
+    } finally {
+      setShowPaymentModal(false);
+      setSelectedOrder(null);
+    }
+  };
+
+  // ---------------- NEW ORDER MODAL ----------------
   const addToCart = (p) => {
     const ex = cart.find((x) => x.id === p.id);
     ex
@@ -107,55 +202,13 @@ function Waiter() {
     }
   };
 
-  // 🔹 Teslim / Ödeme / Düzenleme
-  const handleDelivered = async (o) => {
-    try {
-      await updateOrderStatus(o.tableId, o.id, "Teslim Edildi");
-      await updateDoc(doc(db, "tables", o.tableId, "orders", o.id), {
-        deliveredAt: new Date(),
-      });
-      alert(`✅ ${o.tableId} masası teslim edildi olarak işaretlendi`);
-    } catch {
-      alert("❌ Güncelleme başarısız");
-    }
-  };
-
-  const handlePayment = async (method) => {
-    try {
-      const { tableId, id } = selectedOrder;
-      const ref = doc(db, "tables", tableId, "orders", id);
-      await updateDoc(ref, {
-        paymentStatus: "Alındı",
-        paymentMethod: method,
-        paymentAt: new Date(),
-      });
-      await moveToPastOrders(tableId, id, {
-        ...selectedOrder,
-        paymentStatus: "Alındı",
-        paymentMethod: method,
-        paymentAt: new Date(),
-      });
-      alert(`✅ ${method} ile ödeme alındı! Masa ${tableId} boşaltıldı.`);
-      setShowPaymentModal(false);
-      setSelectedOrder(null);
-    } catch {
-      alert("❌ Ödeme kaydedilemedi.");
-    }
-  };
-
-  const openEditModal = (order) => {
-    setEditOrder(order);
-    setEditCart(order.items || []);
-    setShowEditModal(true);
-  };
-
+  // ---------------- EDIT MODAL ----------------
   const addToEditCart = (product) => {
     const ex = editCart.find((p) => p.id === product.id);
     ex
       ? setEditCart(editCart.map((p) => (p.id === product.id ? { ...p, qty: p.qty + 1 } : p)))
       : setEditCart([...editCart, { ...product, qty: 1 }]);
   };
-
   const increaseQty = (id) =>
     setEditCart(editCart.map((p) => (p.id === id ? { ...p, qty: p.qty + 1 } : p)));
   const decreaseQty = (id) =>
@@ -185,6 +238,7 @@ function Waiter() {
     }
   };
 
+  // ---------------- RENDER ----------------
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* ÜST BAR */}
@@ -202,29 +256,47 @@ function Waiter() {
 
           {/* Sekmeler */}
           <div className="flex border-b border-gray-300">
+            {/* Aktif */}
             <button
-              onClick={() => setShowDelivered(false)}
+              onClick={() => setActiveTab("active")}
               className={`relative px-4 py-2 text-sm font-medium transition-all ${
-                !showDelivered
+                activeTab === "active"
                   ? "text-blue-700 border-b-2 border-blue-700"
                   : "text-gray-500 hover:text-blue-600"
               }`}
             >
               📋 Aktif Siparişler
-              {!showDelivered && (
+              {activeTab === "active" && (
                 <span className="absolute bottom-0 left-0 w-full h-[2px] bg-blue-700"></span>
               )}
             </button>
+
+            {/* Teslim Edilenler (YENİ) */}
             <button
-              onClick={() => setShowDelivered(true)}
+              onClick={() => setActiveTab("delivered")}
               className={`relative px-4 py-2 text-sm font-medium transition-all ${
-                showDelivered
+                activeTab === "delivered"
                   ? "text-blue-700 border-b-2 border-blue-700"
                   : "text-gray-500 hover:text-blue-600"
               }`}
             >
-              📦 Teslim Edilenler
-              {showDelivered && (
+              🚚 Teslim Edilenler
+              {activeTab === "delivered" && (
+                <span className="absolute bottom-0 left-0 w-full h-[2px] bg-blue-700"></span>
+              )}
+            </button>
+
+            {/* Ödenenler (eski "Teslim Edilenler") */}
+            <button
+              onClick={() => setActiveTab("paid")}
+              className={`relative px-4 py-2 text-sm font-medium transition-all ${
+                activeTab === "paid"
+                  ? "text-blue-700 border-b-2 border-blue-700"
+                  : "text-gray-500 hover:text-blue-600"
+              }`}
+            >
+              💰 Ödenenler
+              {activeTab === "paid" && (
                 <span className="absolute bottom-0 left-0 w-full h-[2px] bg-blue-700"></span>
               )}
             </button>
@@ -232,47 +304,70 @@ function Waiter() {
         </div>
       </div>
 
-      {/* SİPARİŞ LİSTESİ */}
-      {filteredList.map((o) => (
-        <div key={o.id} className={`p-3 border rounded mb-3 ${getBgColor(o.status)}`}>
+      {/* LİSTE */}
+      {listForTab.map((o) => (
+        <div key={`${o.tableId}-${o.id}`} className={`p-3 border rounded mb-3 ${getBgColor(o.status)}`}>
           <div className="flex justify-between items-center">
-            <p className="font-semibold">Masa: {o.tableId}</p>
-            {!showDelivered && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => openEditModal(o)}
-                  className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                >
-                  ✏️ Düzenle
-                </button>
-                <button
-                  onClick={() => handleDelivered(o)}
-                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  ✅ Teslim Edildi
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedOrder(o);
-                    setShowPaymentModal(true);
-                  }}
-                  className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
-                >
-                  💰 Ödeme Al
-                </button>
-              </div>
-            )}
+            <p className="font-semibold">
+              Masa: {o.tableId}{" "}
+              <span className="text-sm text-gray-500">({o.status || "—"})</span>
+            </p>
+            <p className="font-semibold">{o.total} ₺</p>
           </div>
-          <p>
-            <strong>Ürünler:</strong> {o.items.map((i) => `${i.name} x${i.qty}`).join(", ")}
+
+          <p className="mt-1">
+            <strong>Ürünler:</strong> {o.items?.map((i) => `${i.name} x${i.qty}`).join(", ")}
           </p>
-          <p>
-            <strong>Toplam:</strong> {o.total} ₺
-          </p>
+
+          {/* Aktif sekmede: Düzenle + Teslim Edildi */}
+          {activeTab === "active" && (
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => openEditModal(o)}
+                className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+              >
+                ✏️ Düzenle
+              </button>
+              <button
+                onClick={() => handleDelivered(o)}
+                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                🚚 Teslim Edildi
+              </button>
+              {/* NOT: Ödeme Al burada YOK */}
+            </div>
+          )}
+
+          {/* Teslim Edilenler sekmesinde: Ödeme Al */}
+          {activeTab === "delivered" && (
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => openPayment(o)}
+                className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                💰 Ödeme Al
+              </button>
+            </div>
+          )}
+
+          {/* Ödenenler sekmesinde: sadece bilgi (paymentMethod, paymentAt) */}
+          {activeTab === "paid" && (
+            <div className="mt-2 text-sm text-gray-700">
+              <div>
+                <strong>Ödeme:</strong> {o.paymentMethod || "-"}
+              </div>
+              <div>
+                <strong>Tarih:</strong>{" "}
+                {o.paymentAt?.seconds
+                  ? new Date(o.paymentAt.seconds * 1000).toLocaleString("tr-TR")
+                  : "-"}
+              </div>
+            </div>
+          )}
         </div>
       ))}
 
-      {/* 🆕 YENİ SİPARİŞ MODAL (ESKİ DÜZENLİ HALİYLE) */}
+      {/* 🆕 YENİ SİPARİŞ MODAL (scrollable + sticky footer) */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 overflow-y-auto">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl relative flex flex-col max-h-[92vh]">
@@ -289,14 +384,9 @@ function Waiter() {
               ✕
             </button>
 
-            {/* Başlık */}
-            <h3 className="text-xl font-bold mb-4 flex-shrink-0">
-              🍽️ Yeni Sipariş Oluştur
-            </h3>
+            <h3 className="text-xl font-bold mb-4 flex-shrink-0">🍽️ Yeni Sipariş Oluştur</h3>
 
-            {/* İçerik (scrollable alan) */}
             <div className="overflow-y-auto flex-1 pr-1 pb-4">
-              {/* Masa ID */}
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-1">Masa ID</label>
                 <input
@@ -308,7 +398,6 @@ function Waiter() {
                 />
               </div>
 
-              {/* Ürün Grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                 {products.map((p) => (
                   <div
@@ -329,38 +418,25 @@ function Waiter() {
                 ))}
               </div>
 
-              {/* Sepet */}
               <div className="border-t pt-3">
                 <h4 className="font-semibold mb-2">🧺 Sepet</h4>
                 {cart.length === 0 ? (
                   <p className="text-gray-500 text-sm">Sepet boş.</p>
                 ) : (
                   cart.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex justify-between items-center mb-2 text-sm"
-                    >
+                    <div key={p.id} className="flex justify-between items-center mb-2 text-sm">
                       <span>
                         {p.name} × {p.qty}
                       </span>
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => dec(p.id)}
-                          className="bg-gray-200 px-2 rounded"
-                        >
+                        <button onClick={() => dec(p.id)} className="bg-gray-200 px-2 rounded">
                           −
                         </button>
                         <span>{p.qty}</span>
-                        <button
-                          onClick={() => inc(p.id)}
-                          className="bg-gray-200 px-2 rounded"
-                        >
+                        <button onClick={() => inc(p.id)} className="bg-gray-200 px-2 rounded">
                           +
                         </button>
-                        <button
-                          onClick={() => removeFromCart(p.id)}
-                          className="text-red-600 text-xs"
-                        >
+                        <button onClick={() => removeFromCart(p.id)} className="text-red-600 text-xs">
                           Sil
                         </button>
                       </div>
@@ -370,7 +446,6 @@ function Waiter() {
               </div>
             </div>
 
-            {/* Sticky Footer */}
             <div className="flex justify-between items-center mt-3 border-t pt-3 bg-white sticky bottom-0">
               <strong>Toplam: {total(cart)} ₺</strong>
               <button
@@ -378,6 +453,75 @@ function Waiter() {
                 className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
               >
                 Siparişi Gönder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✏️ DÜZENLE MODAL */}
+      {showEditModal && editOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="absolute top-2 right-3 text-gray-500 hover:text-black text-xl"
+            >
+              ✕
+            </button>
+            <h3 className="text-xl font-bold mb-4">✏️ Siparişi Düzenle</h3>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {products.map((p) => (
+                <div key={p.id} className="border rounded p-3 flex flex-col justify-between bg-gray-50 shadow-sm">
+                  <div>
+                    <h4 className="font-semibold">{p.name}</h4>
+                    <p className="text-gray-600 text-sm">{p.price} ₺</p>
+                  </div>
+                  <button
+                    onClick={() => addToEditCart(p)}
+                    className="mt-2 bg-blue-600 text-white py-1 rounded hover:bg-blue-700"
+                  >
+                    Ekle
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t pt-3">
+              <h4 className="font-semibold mb-2">Sepet</h4>
+              {editCart.length === 0 ? (
+                <p className="text-gray-500 text-sm">Sepet boş.</p>
+              ) : (
+                editCart.map((p) => (
+                  <div key={p.id} className="flex justify-between items-center mb-2 text-sm">
+                    <span>
+                      {p.name} × {p.qty}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => decreaseQty(p.id)} className="bg-gray-200 px-2">
+                        −
+                      </button>
+                      <button onClick={() => increaseQty(p.id)} className="bg-gray-200 px-2">
+                        +
+                      </button>
+                      <button onClick={() => removeFromEditCart(p.id)} className="text-red-600">
+                        Sil
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-between items-center mt-4 border-t pt-3">
+              <strong>Toplam: {total(editCart)} ₺</strong>
+              <button
+                onClick={saveEditedOrder}
+                disabled={isSaving}
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
+              >
+                Kaydet
               </button>
             </div>
           </div>
@@ -397,19 +541,19 @@ function Waiter() {
             <div className="flex flex-col gap-3">
               <button
                 className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-                onClick={() => handlePayment("QR")}
+                onClick={() => confirmPayment("QR")}
               >
                 🟢 QR ile Ödeme
               </button>
               <button
                 className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                onClick={() => handlePayment("Kart")}
+                onClick={() => confirmPayment("Kart")}
               >
                 💳 Kredi/Banka Kartı
               </button>
               <button
                 className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                onClick={() => handlePayment("Nakit")}
+                onClick={() => confirmPayment("Nakit")}
               >
                 💵 Nakit
               </button>
