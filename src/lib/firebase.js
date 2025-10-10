@@ -1,6 +1,8 @@
 // ✅ Firebase yapılandırması (Auth + Firestore dahil)
 
 import { initializeApp } from "firebase/app";
+import { getDoc } from "firebase/firestore";
+
 import {
   getFirestore,
   serverTimestamp,
@@ -47,4 +49,5 @@ export {
   query,
   orderBy,
   where,
+  getDoc,
 };
