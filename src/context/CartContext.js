@@ -15,7 +15,9 @@ export function CartProvider({ children }) {
     const ref = doc(db, "tables", tableId);
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists() && snap.data().cart) {
-        setItems(snap.data().cart.items || []);
+        // Okunan veriyi sayıya çevirerek state'e yükle (ilk yükleme güvenliği)
+        const itemsFromDb = snap.data().cart.items || [];
+        setItems(itemsFromDb.map(item => ({ ...item, qty: Number(item.qty) })));
       }
     });
     return () => unsub();
@@ -23,9 +25,15 @@ export function CartProvider({ children }) {
 
   // 🔹 Firestore ve local state'i senkronize et
   const syncCart = (newItems) => {
-    const total = newItems.reduce((sum, p) => sum + p.price * p.qty, 0);
-    setItems(newItems);
-    updateCart(tableId, newItems, total);
+    // ✅ DÜZELTME: Sepet güncellenirken her zaman qty'yi sayıya çevir
+    const preparedItems = newItems.map(item => ({
+        ...item,
+        qty: Number(item.qty)
+    }));
+
+    const total = preparedItems.reduce((sum, p) => sum + p.price * p.qty, 0);
+    setItems(preparedItems); // Local state'i sayı formatında güncelle
+    updateCart(tableId, preparedItems, total); // Firestore'a sayı formatında kaydet
   };
 
   // 🔹 Ürün ekleme
@@ -33,7 +41,7 @@ export function CartProvider({ children }) {
     const existing = items.find((p) => p.id === product.id);
     const newItems = existing
       ? items.map((p) =>
-          p.id === product.id ? { ...p, qty: p.qty + 1 } : p
+          p.id === product.id ? { ...p, qty: Number(p.qty) + 1 } : p
         )
       : [...items, { ...product, qty: 1 }];
     syncCart(newItems);
@@ -43,7 +51,7 @@ export function CartProvider({ children }) {
   const increaseQty = (id) =>
     syncCart(
       items.map((p) =>
-        p.id === id ? { ...p, qty: p.qty + 1 } : p
+        p.id === id ? { ...p, qty: Number(p.qty) + 1 } : p // ✅ Güvenli artırma
       )
     );
 
@@ -51,9 +59,9 @@ export function CartProvider({ children }) {
     syncCart(
       items
         .map((p) =>
-          p.id === id ? { ...p, qty: p.qty - 1 } : p
+          p.id === id ? { ...p, qty: Number(p.qty) - 1 } : p // ✅ Güvenli azaltma
         )
-        .filter((p) => p.qty > 0)
+        .filter((p) => Number(p.qty) > 0) // ✅ Güvenli filtreleme
     );
 
   const removeItem = (id) => syncCart(items.filter((p) => p.id !== id));
