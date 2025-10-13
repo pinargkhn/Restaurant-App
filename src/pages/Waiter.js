@@ -43,6 +43,76 @@ function Waiter() {
 
   const total = (arr) => arr.reduce((s, p) => s + p.price * p.qty, 0);
 
+  // ---------------- YARDIMCI VE BİRLEŞTİRME (MERGE) LOGİĞİ ----------------
+  
+  // Sipariş ürünlerini birleştirir (aynı ürünlerin miktarlarını toplar)
+  const mergeItems = (orders) => {
+    const combinedItems = {};
+    orders.forEach(order => {
+        (order.items || []).forEach(item => {
+            const key = item.id;
+            if (combinedItems[key]) {
+                combinedItems[key].qty += item.qty;
+            } else {
+                combinedItems[key] = { ...item };
+            }
+        });
+    });
+    return Object.values(combinedItems);
+  };
+
+  // Birleştirilmiş siparişin durumunu belirler (Hazır > Hazırlanıyor > Teslim Edildi > Yeni)
+  const getMergedStatus = (orders) => {
+    if (orders.some(o => o.status === "Hazır")) return "Hazır";
+    if (orders.some(o => o.status === "Hazırlanıyor")) return "Hazırlanıyor";
+    if (orders.some(o => o.status === "Teslim Edildi")) return "Teslim Edildi";
+    return "Yeni";
+  };
+
+  // Birleştirilmiş siparişte yeni ürün eklenmiş mi kontrolü
+  const getMergedNewItemsAdded = (orders) => {
+    return orders.some(o => o.newItemsAdded === true);
+  };
+
+  /**
+   * Aynı masa ID'sine sahip ve ÖDENMEMİŞ siparişleri tek bir satırda birleştirir.
+   */
+  const mergeOrdersByTable = (allOrders) => {
+    // 1. Sadece ödenmemiş (paymentStatus !== "Alındı") siparişleri al
+    const nonPaidOrders = allOrders.filter(o => o.paymentStatus !== "Alındı");
+
+    // 2. Masa ID'sine göre grupla
+    const groupedOrders = nonPaidOrders.reduce((acc, order) => {
+        acc[order.tableId] = acc[order.tableId] || [];
+        acc[order.tableId].push(order);
+        return acc;
+    }, {});
+
+    // 3. Her grubu tek bir birleştirilmiş sipariş nesnesine dönüştür
+    return Object.entries(groupedOrders).map(([tableId, tableOrders]) => {
+        // En son güncellenen belgeyi bul (sıralama için)
+        const latestOrder = tableOrders.sort((a, b) => (b.updatedAt?.seconds || b.createdAt?.seconds || 0) - (a.updatedAt?.seconds || a.createdAt?.seconds || 0))[0];
+
+        return {
+            tableId,
+            // 🚨 Önemli: id artık tüm alt belge ID'lerinin dizisidir
+            id: tableOrders.map(o => o.id), 
+            orderDocuments: tableOrders, // Eylemler için orijinal belgeler
+
+            total: tableOrders.reduce((sum, o) => sum + (o.total || 0), 0),
+            items: mergeItems(tableOrders),
+            status: getMergedStatus(tableOrders),
+            newItemsAdded: getMergedNewItemsAdded(tableOrders),
+
+            createdAt: latestOrder.createdAt,
+            updatedAt: latestOrder.updatedAt,
+            readyAt: latestOrder.readyAt,
+            deliveredAt: latestOrder.deliveredAt,
+            paymentStatus: "Bekleniyor",
+        };
+    });
+  };
+
   // ---------------- SIRALAMA ----------------
   const compareOrders = (a, b) => {
     if (a.status === "Hazır" && b.status === "Hazır")
@@ -91,22 +161,26 @@ function Waiter() {
   }, []);
 
   // ---------------- FİLTRELER ----------------
+  const mergedOrders = useMemo(() => mergeOrdersByTable(orders), [orders]);
+
   const activeOrders = useMemo(
     () =>
-      orders.filter(
-        (o) =>
-          o.status !== "Teslim Edildi" && o.paymentStatus !== "Alındı"
-      ),
-    [orders]
+      mergedOrders
+        .filter((o) => o.status !== "Teslim Edildi")
+        .sort(compareOrders),
+    [mergedOrders]
   );
+  
   const deliveredOrders = useMemo(
     () =>
-      orders.filter(
-        (o) => o.status === "Teslim Edildi" && o.paymentStatus !== "Alındı"
-      ),
-    [orders]
+      mergedOrders
+        .filter((o) => o.status === "Teslim Edildi")
+        .sort(compareOrders),
+    [mergedOrders]
   );
+
   const paidOrders = useMemo(() => {
+    // Ödenenler birleştirilmez, ayrı ayrı listelenir.
     const fromCurrent = orders.filter((o) => o.paymentStatus === "Alındı");
     const fromPast = pastPaid.filter((o) => o.paymentStatus === "Alındı");
     const all = [...fromPast, ...fromCurrent];
@@ -121,6 +195,7 @@ function Waiter() {
         : activeTab === "delivered"
         ? deliveredOrders
         : paidOrders;
+
     if (!search.trim()) return list;
     const query = search.trim().toLowerCase();
     return list.filter((o) => o.tableId?.toLowerCase().includes(query));
@@ -136,60 +211,85 @@ function Waiter() {
       ? "bg-yellow-100"
       : "bg-white";
 
-  // ---------------- ACTIONS ----------------
-  const openEditModal = (order) => {
-    setEditOrder(order);
-    setEditCart(order.items || []);
+  // ---------------- ACTIONS (GÜNCELLENDİ) ----------------
+  
+  // 🚨 openEditModal: Birleştirilmiş siparişin tüm ürünleriyle modalı açar.
+  const openEditModal = (mergedOrder) => {
+    // Düzenlenecek sipariş için en son oluşturulan belgeyi bul (Güncelleme hedefi)
+    const latestOrderDoc = mergedOrder.orderDocuments.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0))[0];
+
+    // Modal state'ini ayarla
+    setEditOrder({
+        tableId: mergedOrder.tableId,
+        id: latestOrderDoc.id // Güncelleme için tek bir ID kullanılır
+    });
+    setEditCart(mergedOrder.items || []); // Birleştirilmiş ürün listesini düzenleme için kullan
     setShowEditModal(true);
   };
 
-  const markDelivered = async (o) => {
+  // 🚨 markDelivered: Birleştirilmiş siparişe ait TÜM alt siparişleri 'Teslim Edildi' yapar.
+  const markDelivered = async (mergedOrder) => {
     try {
-      await updateDoc(doc(db, "tables", o.tableId, "orders", o.id), {
-        status: "Teslim Edildi",
-        deliveredAt: new Date(),
-      });
+        // Tüm alt sipariş ID'leri üzerinde döngü
+        for (const orderId of mergedOrder.id) {
+            const orderRef = doc(db, "tables", mergedOrder.tableId, "orders", orderId);
+            await updateDoc(orderRef, {
+                status: "Teslim Edildi",
+                deliveredAt: new Date(),
+            });
+        }
     } catch {
-      alert("❌ Güncelleme başarısız");
+        alert("❌ Güncelleme başarısız");
     }
   };
 
-  const openPayment = (order) => {
-    setSelectedOrder(order);
+  // 🚨 openPayment: Birleştirilmiş sipariş nesnesini seçer
+  const openPayment = (mergedOrder) => {
+    setSelectedOrder(mergedOrder); // mergedOrder nesnesi artık seçili sipariş
     setPaymentMethod("");
     setShowPaymentModal(true);
   };
 
+  // 🚨 confirmPayment: Birleştirilmiş siparişe ait TÜM alt siparişlerin ödemesini alır.
   const confirmPayment = async () => {
     if (!selectedOrder || !paymentMethod) return alert("⚠️ Lütfen ödeme yöntemi seçin.");
+
     try {
-      const { tableId, id } = selectedOrder;
-      const orderRef = doc(db, "tables", tableId, "orders", id);
-      const tableRef = doc(db, "tables", tableId);
+        // Tüm alt sipariş belgeleri üzerinde döngü
+        for (const order of selectedOrder.orderDocuments) {
+            const { tableId, id } = order;
+            const orderRef = doc(db, "tables", tableId, "orders", id);
 
-      await updateDoc(orderRef, {
-        paymentStatus: "Alındı",
-        paymentMethod,
-        paymentAt: new Date(),
-      });
+            // 1. Durumu 'Alındı' olarak güncelle
+            await updateDoc(orderRef, {
+                paymentStatus: "Alındı",
+                paymentMethod,
+                paymentAt: new Date(),
+            });
 
-      await moveToPastOrders(tableId, id, {
-        ...selectedOrder,
-        paymentStatus: "Alındı",
-        paymentMethod,
-        paymentAt: new Date(),
-      });
+            // 2. Geçmiş siparişlere taşı
+            await moveToPastOrders(tableId, id, {
+                ...order,
+                paymentStatus: "Alındı",
+                paymentMethod,
+                paymentAt: new Date(),
+            });
+        }
 
-      await updateDoc(tableRef, { cart: { items: [], total: 0 } });
-      alert(`✅ ${paymentMethod} ile ödeme alındı ve masa sıfırlandı!`);
+        // 3. Masanın sepetini sıfırla
+        const tableRef = doc(db, "tables", selectedOrder.tableId);
+        await updateDoc(tableRef, { cart: { items: [], total: 0 } });
+
+        alert(`✅ ${paymentMethod} ile ödeme alındı ve masa sıfırlandı!`);
     } catch (e) {
-      console.error(e);
-      alert("❌ Ödeme kaydedilemedi veya masa sıfırlanamadı.");
+        console.error(e);
+        alert("❌ Ödeme kaydedilemedi veya masa sıfırlanamadı.");
     } finally {
-      setShowPaymentModal(false);
-      setSelectedOrder(null);
+        setShowPaymentModal(false);
+        setSelectedOrder(null);
     }
   };
+
 
   // ---------------- YENİ SİPARİŞ MODAL ----------------
   const addToCart = (p) => {
@@ -216,7 +316,6 @@ function Waiter() {
       const snap = await getDoc(ref);
       if (!snap.exists()) return alert("❌ Bu masa sistemde kayıtlı değil.");
       
-      // Masa doğrulanırsa siparişi oluştur
       await submitOrder({ tableId, items: cart, total: total(cart) });
       
       alert(`✅ Sipariş gönderildi (${tableId})`);
@@ -259,6 +358,7 @@ function Waiter() {
     if (!editCart.length) return alert("Sipariş boş olamaz!");
     setIsSaving(true);
     try {
+      // editOrder.id tek bir sipariş belgesinin ID'sidir (latestOrderDoc.id)
       const ref = doc(db, "tables", editOrder.tableId, "orders", editOrder.id);
       await updateDoc(ref, {
         items: editCart,
@@ -284,7 +384,7 @@ function Waiter() {
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3 border-b pb-2">
         <h2 className="text-2xl font-bold">🧑‍🍳 Garson Paneli</h2>
         <div className="flex gap-3 w-full sm:w-auto">
-          {/* Yeni Sipariş Butonu EKLENDİ */}
+          {/* Yeni Sipariş Butonu */}
           <button
             onClick={() => setShowModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition font-semibold whitespace-nowrap"
@@ -337,15 +437,19 @@ function Waiter() {
       </div>
 
       {/* LİSTE */}
-      {filteredList.sort(compareOrders).map((o) => (
+      {filteredList.map((o) => (
         <div
-          key={`${o.tableId}-${o.id}`}
+          // Birleştirilmiş siparişler için sadece tableId'yi kullan
+          // Ödenenler için ID+paid kullanılır, çünkü bunlar birleştirilmez.
+          key={o.paymentAt ? o.id + "paid" : o.tableId} 
           className={`p-3 border rounded mb-3 ${getBgColor(o.status)}`}
         >
           <div className="flex justify-between items-center">
             <p className="font-semibold">
               Masa: {o.tableId}{" "}
-              <span className="text-sm text-gray-500">({o.status || "—"})</span>
+              <span className="text-sm text-gray-500">
+                ({o.status || (o.paymentStatus === "Alındı" ? "Ödendi" : "—")})
+              </span>
             </p>
             <p className="font-semibold">{o.total} ₺</p>
           </div>
@@ -354,8 +458,8 @@ function Waiter() {
             {o.items?.map((i) => `${i.name} x${i.qty}`).join(", ")}
           </p>
 
-          {/* Aktif sekme */}
-          {activeTab === "active" && (
+          {/* Aktif ve Teslim Edilen sekmeleri (Birleştirilmiş Siparişler) */}
+          {(activeTab === "active" || activeTab === "delivered") && (
             <div className="flex gap-2 mt-3">
               <button
                 onClick={() => openEditModal(o)}
@@ -363,28 +467,26 @@ function Waiter() {
               >
                 ✏️ Düzenle
               </button>
-              <button
-                onClick={() => markDelivered(o)}
-                className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-              >
-                🚚 Teslim Edildi
-              </button>
+              {o.status !== "Teslim Edildi" && (
+                <button
+                  onClick={() => markDelivered(o)}
+                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                >
+                  🚚 Teslim Edildi
+                </button>
+              )}
+              {o.status === "Teslim Edildi" && (
+                <button
+                  onClick={() => openPayment(o)}
+                  className="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
+                >
+                  💰 Ödeme Al
+                </button>
+              )}
             </div>
           )}
 
-          {/* Teslim Edilen sekme */}
-          {activeTab === "delivered" && (
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => openPayment(o)}
-                className="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
-              >
-                💰 Ödeme Al
-              </button>
-            </div>
-          )}
-
-          {/* Ödenen sekme */}
+          {/* Ödenen sekme (Tekil Siparişler) */}
           {activeTab === "paid" && (
             <div className="mt-2 text-sm text-gray-700">
               <div>
