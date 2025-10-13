@@ -11,7 +11,6 @@ import {
 } from "../lib/firebase";
 import { QRCodeCanvas } from "qrcode.react";
 
-// 🔹 Gerçek pişirme süresi hesaplama (startCookingAt → readyAt)
 const calculateCookingTime = (startCookingAt, readyAt) => {
   if (!startCookingAt?.seconds || !readyAt?.seconds) return null;
   const diff = readyAt.seconds - startCookingAt.seconds;
@@ -26,6 +25,20 @@ const average = (values) => {
   return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
 };
 
+// 🔹 Siparişleri özel kurala göre sırala
+const compareOrders = (a, b) => {
+  if (a.newItemsAdded && !b.newItemsAdded) return -1;
+  if (!a.newItemsAdded && b.newItemsAdded) return 1;
+
+  if (a.status === "Hazır" && b.status === "Hazır") {
+    return (b.readyAt?.seconds || 0) - (a.readyAt?.seconds || 0);
+  }
+
+  const aTime = a.updatedAt?.seconds || a.paymentAt?.seconds || 0;
+  const bTime = b.updatedAt?.seconds || b.paymentAt?.seconds || 0;
+  return bTime - aTime;
+};
+
 export default function AdminDashboard() {
   const [view, setView] = useState("dashboard");
   const [orders, setOrders] = useState([]);
@@ -34,7 +47,6 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const baseUrl = window.location.origin;
 
-  // 🔹 Siparişleri dinle (hem aktif hem geçmiş)
   useEffect(() => {
     const unsubOrders = onSnapshot(collectionGroup(db, "orders"), (snap) => {
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -58,7 +70,6 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  // 🔹 Masaları dinle
   useEffect(() => {
     const unsubTables = onSnapshot(collection(db, "tables"), (snap) => {
       setTables(
@@ -70,7 +81,6 @@ export default function AdminDashboard() {
     return () => unsubTables();
   }, []);
 
-  // 🔹 Masa işlemleri
   const handleAddTable = async () => {
     if (!newTableId.trim()) return;
     const ref = doc(db, "tables", newTableId);
@@ -84,7 +94,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // 🔹 Ödemesi alınan siparişler
   const paidOrders = useMemo(
     () =>
       orders.filter(
@@ -95,7 +104,6 @@ export default function AdminDashboard() {
     [orders]
   );
 
-  // 🔹 Ortalama süre istatistikleri
   const completedOrders = useMemo(
     () =>
       orders
@@ -117,16 +125,11 @@ export default function AdminDashboard() {
     };
   }, [orders, completedOrders, paidOrders]);
 
-  // ============================================================
-  // ============ DASHBOARD GÖRÜNÜMÜ ============================
-  // ============================================================
-
   if (view === "dashboard") {
     return (
       <div className="p-6 max-w-6xl mx-auto">
         <h2 className="text-3xl font-bold mb-6 text-center">🧑‍💼 Yönetici Paneli</h2>
 
-        {/* Görünüm değiştirme */}
         <div className="flex justify-end mb-6">
           <button
             onClick={() => setView("tables")}
@@ -136,7 +139,6 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        {/* İstatistik Kartları */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           <div className="bg-blue-100 p-4 rounded shadow text-center">
             <h3 className="text-lg font-semibold">Toplam Sipariş</h3>
@@ -148,13 +150,10 @@ export default function AdminDashboard() {
           </div>
           <div className="bg-yellow-100 p-4 rounded shadow text-center">
             <h3 className="text-lg font-semibold">Ortalama Hazırlık Süresi</h3>
-            <p className="text-2xl font-bold text-yellow-700">
-              {stats.avgPrepTime} dk
-            </p>
+            <p className="text-2xl font-bold text-yellow-700">{stats.avgPrepTime} dk</p>
           </div>
         </div>
 
-        {/* 💰 Ödemesi Alınan Siparişler Tablosu */}
         <h3 className="text-xl font-semibold mb-3 text-gray-700">
           💰 Ödemesi Alınan Siparişler
         </h3>
@@ -170,52 +169,39 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            {[...paidOrders]
-              .sort((a, b) => {
-                const aTime = a.paymentAt?.seconds || 0;
-                const bTime = b.paymentAt?.seconds || 0;
-                return bTime - aTime;
-              })
-              .map((o) => {
-                const cookingTime = calculateCookingTime(
-                  o.startCookingAt,
-                  o.readyAt
-                );
-                const productList = o.items
-                  ? o.items.map((it) => `${it.name} ×${it.qty || 1}`).join(", ")
-                  : "-";
-                return (
-                  <tr key={`${o.id}-${o.tableId}`} className="hover:bg-gray-50">
-                    <td className="border p-2">{o.tableId || "-"}</td>
-                    <td className="border p-2 font-medium text-green-700">
-                      {o.paymentMethod || "-"}
-                    </td>
-                    <td className="border p-2 text-sm text-gray-800">{productList}</td>
-                    <td className="border p-2 text-center">
-                      {cookingTime
-                        ? `${cookingTime.minutes} dk ${cookingTime.seconds} sn`
-                        : "-"}
-                    </td>
-                    <td className="border p-2">
-                      {o.paymentAt?.seconds
-                        ? new Date(o.paymentAt.seconds * 1000).toLocaleString("tr-TR")
-                        : "-"}
-                    </td>
-                    <td className="border p-2 font-semibold text-right">
-                      {o.total ? `${o.total} ₺` : "-"}
-                    </td>
-                  </tr>
-                );
-              })}
+            {[...paidOrders].sort(compareOrders).map((o) => {
+              const cookingTime = calculateCookingTime(o.startCookingAt, o.readyAt);
+              const productList = o.items
+                ? o.items.map((it) => `${it.name} ×${it.qty || 1}`).join(", ")
+                : "-";
+              return (
+                <tr key={`${o.id}-${o.tableId}`} className="hover:bg-gray-50">
+                  <td className="border p-2">{o.tableId || "-"}</td>
+                  <td className="border p-2 font-medium text-green-700">
+                    {o.paymentMethod || "-"}
+                  </td>
+                  <td className="border p-2 text-sm text-gray-800">{productList}</td>
+                  <td className="border p-2 text-center">
+                    {cookingTime
+                      ? `${cookingTime.minutes} dk ${cookingTime.seconds} sn`
+                      : "-"}
+                  </td>
+                  <td className="border p-2">
+                    {o.paymentAt?.seconds
+                      ? new Date(o.paymentAt.seconds * 1000).toLocaleString("tr-TR")
+                      : "-"}
+                  </td>
+                  <td className="border p-2 font-semibold text-right">
+                    {o.total ? `${o.total} ₺` : "-"}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
     );
   }
-
-  // ============================================================
-  // ============ MASA & QR YÖNETİMİ ============================
-  // ============================================================
 
   return (
     <div className="p-6 max-w-6xl mx-auto">

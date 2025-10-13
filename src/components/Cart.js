@@ -1,75 +1,107 @@
+import React from "react";
 import { useCart } from "../context/CartContext";
 import { submitOrder } from "../lib/orders";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 export default function Cart() {
-  const { items, total, increaseQty, decreaseQty, removeItem, clearCart } = useCart();
-  const tableId = new URLSearchParams(window.location.search).get("table") || "unknown";
+  const {
+    items,
+    total,
+    tableId,
+    clearCart,
+    increaseQty,
+    decreaseQty,
+    removeItem,
+  } = useCart();
 
+  // 🔹 Siparişi Firestore'a gönder
   const handleConfirm = async () => {
     if (!items.length) return alert("Sepet boş!");
+
     try {
-      console.log("Sipariş gönderiliyor:", { tableId, items, total });
+      console.log("🚀 Sipariş gönderiliyor:", { tableId, items, total });
 
-      const orderId = await submitOrder({ tableId, items, total });
-      console.log("Sipariş eklendi ID:", orderId);
+      // 1️⃣ Siparişi orders alt koleksiyonuna gönder
+      await submitOrder({ tableId, items, total });
 
-      await clearCart(); // ✅ sepet temizlenir
-      alert("Sipariş alındı!");
+      // 2️⃣ Masa altındaki cart alanını sıfırla
+      const ref = doc(db, "tables", tableId);
+      await updateDoc(ref, {
+        cart: { items: [], total: 0 },
+      });
+
+      // 3️⃣ Yerel sepeti temizle
+      clearCart();
+
+      alert("✅ Sipariş başarıyla gönderildi!");
     } catch (e) {
-      console.error("Sipariş gönderilemedi:", e);
-      alert("Sipariş gönderilemedi.");
+      console.error("🔥 Sipariş gönderme hatası:", e);
+      alert("❌ Sipariş gönderilemedi. Lütfen tekrar deneyin.");
     }
   };
 
   return (
-    <aside className="w-80 bg-white shadow-lg p-4 sticky top-0 h-screen overflow-y-auto">
-      <h3 className="text-xl font-semibold mb-3">Sepet</h3>
+    <div className="bg-gray-100 shadow-md rounded-lg p-4 w-full md:w-80">
+      <h2 className="text-lg font-bold mb-3 text-center">🛒 Sepet</h2>
 
-      {!items.length && <p className="text-gray-500">Sepet boş.</p>}
-
-      {!!items.length && (
+      {items.length === 0 ? (
+        <p className="text-gray-500 text-center">Sepet boş.</p>
+      ) : (
         <>
-          <ul className="divide-y">
-            {items.map((p) => (
-              <li key={p.id} className="py-2 flex justify-between items-center">
-                <span className="font-medium">{p.name}</span>
+          <ul className="divide-y divide-gray-300">
+            {items.map((item) => (
+              <li
+                key={item.id}
+                className="py-2 flex justify-between items-center"
+              >
+                <div className="flex flex-col">
+                  <span className="font-semibold">{item.name}</span>
+                  <span className="text-sm text-gray-500">
+                    {item.price} ₺
+                  </span>
+                </div>
+
                 <div className="flex items-center gap-2">
                   <button
-                    className="px-2 py-1 bg-gray-200 rounded"
-                    onClick={() => decreaseQty(p.id)}
+                    onClick={() => decreaseQty(item.id)}
+                    className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
                   >
                     −
                   </button>
-                  <span>{p.qty}</span>
+                  <span className="font-medium">{item.qty}</span>
                   <button
-                    className="px-2 py-1 bg-gray-200 rounded"
-                    onClick={() => increaseQty(p.id)}
+                    onClick={() => increaseQty(item.id)}
+                    className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
                   >
                     +
                   </button>
-                  <span className="font-semibold">{p.price * p.qty} ₺</span>
                   <button
-                    className="text-red-600 ml-2"
-                    onClick={() => removeItem(p.id)}
+                    onClick={() => removeItem(item.id)}
+                    className="text-red-500 hover:text-red-700 ml-2 text-sm"
                   >
-                    Sil
+                    ❌
                   </button>
                 </div>
               </li>
             ))}
           </ul>
 
-          <div className="flex justify-between items-center mt-4">
-            <span className="text-lg font-bold">Toplam: {total} ₺</span>
+          <div className="mt-4 border-t pt-3">
+            <div className="flex justify-between items-center font-semibold mb-3">
+              <span>Toplam:</span>
+              <span>{total} ₺</span>
+            </div>
+
             <button
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
               onClick={handleConfirm}
+              className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition-all"
             >
-              Sepeti Onayla
+              ✅ Siparişi Gönder
             </button>
           </div>
         </>
       )}
-    </aside>
+    </div>
   );
 }

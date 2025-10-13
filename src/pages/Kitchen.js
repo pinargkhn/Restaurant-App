@@ -45,6 +45,20 @@ export default function Kitchen() {
     }
   };
 
+  // 🔹 Siparişleri özel kurala göre sırala
+  const compareOrders = (a, b) => {
+    if (a.newItemsAdded && !b.newItemsAdded) return -1;
+    if (!a.newItemsAdded && b.newItemsAdded) return 1;
+
+    if (a.status === "Hazır" && b.status === "Hazır") {
+      return (b.readyAt?.seconds || 0) - (a.readyAt?.seconds || 0);
+    }
+
+    const aTime = a.updatedAt?.seconds || a.createdAt?.seconds || 0;
+    const bTime = b.updatedAt?.seconds || b.createdAt?.seconds || 0;
+    return bTime - aTime;
+  };
+
   // 🔹 Sipariş durumunu güncelleme
   const handleStatusChange = async (order, newStatus) => {
     if (!order.tableId || !order.id) {
@@ -55,19 +69,10 @@ export default function Kitchen() {
     try {
       const ref = doc(db, "tables", order.tableId, "orders", order.id);
 
-      // 🔥 Hazırlanıyor: startCookingAt eklenecek
       if (newStatus === "Hazırlanıyor") {
-        await updateDoc(ref, {
-          status: newStatus,
-          startCookingAt: new Date(),
-        });
-      }
-      // 🔥 Hazır: readyAt eklenecek
-      else if (newStatus === "Hazır") {
-        await updateDoc(ref, {
-          status: newStatus,
-          readyAt: new Date(),
-        });
+        await updateDoc(ref, { status: newStatus, startCookingAt: new Date() });
+      } else if (newStatus === "Hazır") {
+        await updateDoc(ref, { status: newStatus, readyAt: new Date() });
       } else {
         await updateDoc(ref, { status: newStatus });
       }
@@ -88,14 +93,9 @@ export default function Kitchen() {
       <ul className="space-y-4">
         {orders
           .filter((o) => o.status !== "Teslim Edildi")
-          .sort(
-            (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-          )
+          .sort(compareOrders)
           .map((o) => (
-            <li
-              key={`${o.tableId}-${o.id}`}
-              className={`rounded shadow p-4 ${getBgColor(o.status)}`}
-            >
+            <li key={`${o.tableId}-${o.id}`} className={`rounded shadow p-4 ${getBgColor(o.status)}`}>
               <div className="flex justify-between items-center">
                 <span className="font-semibold">
                   Masa: {o.tableId}

@@ -1,94 +1,94 @@
-import { db } from "./firebase";
 import {
+  db,
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
   doc,
   setDoc,
-  addDoc,
-  collection,
-  deleteDoc,
   serverTimestamp,
-  updateDoc,
-  getDocs, // 🔹 aktif sipariş kontrolü için eklendi
-} from "firebase/firestore";
+} from "./firebase";
 
-// 🔹 Yeni sipariş oluşturma veya mevcut siparişi güncelleme
+/**
+ * 🔹 Yeni sipariş oluşturur (her zaman yeni belge olarak)
+ */
 export async function submitOrder({ tableId, items, total }) {
-  console.log("🔥 submitOrder çağrıldı:", { tableId, items, total });
+  try {
+    const ordersRef = collection(db, "tables", tableId, "orders");
 
-  const ordersRef = collection(db, "tables", tableId, "orders");
-  const activeOrdersSnap = await getDocs(ordersRef);
-
-  // 🔸 Teslim edilmemiş siparişi bul
-  const existingOrderDoc = activeOrdersSnap.docs.find(
-    (d) => d.data().status !== "Teslim Edildi"
-  );
-
-  if (existingOrderDoc) {
-    console.log("♻️ Aktif sipariş bulundu, mevcut sipariş güncelleniyor...");
-    const existing = existingOrderDoc.data();
-    const mergedItems = [...existing.items];
-
-    // 🔸 Aynı üründen varsa miktar artır, yoksa yeni ekle
-    items.forEach((newItem) => {
-      const idx = mergedItems.findIndex((i) => i.id === newItem.id);
-      if (idx >= 0) mergedItems[idx].qty += newItem.qty || 1;
-      else mergedItems.push(newItem);
-    });
-
-    const newTotal = mergedItems.reduce(
-      (sum, p) => sum + p.price * p.qty,
-      0
-    );
-
-    await updateDoc(existingOrderDoc.ref, {
-      items: mergedItems,
-      total: newTotal,
+    // Yeni sipariş oluştur
+    const orderData = {
+      tableId,
+      items,
+      total,
+      status: "Hazırlanıyor",
+      paymentStatus: "Bekleniyor",
+      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      newItemsAdded: true, // ⚠️ mutfak ve garson için uyarı göstergesi
-    });
+      newItemsAdded: false,
+    };
 
-    console.log("✅ Mevcut sipariş güncellendi:", existingOrderDoc.id);
-    return existingOrderDoc.id;
+    const docRef = await addDoc(ordersRef, orderData);
+    console.log(`🆕 Yeni sipariş oluşturuldu (${tableId}):`, docRef.id);
+    return docRef.id;
+  } catch (e) {
+    console.error("❌ Sipariş oluşturulamadı:", e);
+    throw e;
   }
-
-  // 🆕 Yeni sipariş oluştur
-  const orderData = {
-    items,
-    total,
-    status: "Yeni",
-    createdAt: serverTimestamp(),
-    tableId,
-    newItemsAdded: false,
-  };
-
-  const docRef = await addDoc(ordersRef, orderData);
-  console.log("✅ Yeni sipariş oluşturuldu:", docRef.id);
-  return docRef.id;
 }
 
-// 🔹 Sipariş durumunu güncelle (Hazır olduğunda readyAt ekle)
-export async function updateOrderStatus(tableId, orderId, status) {
-  const ref = doc(db, "tables", tableId, "orders", orderId);
+/**
+ * 🔹 Sipariş durumunu günceller (Hazırlanıyor → Hazır → Teslim Edildi)
+ */
+export async function updateOrderStatus(tableId, orderId, newStatus) {
+  try {
+    const orderRef = doc(db, "tables", tableId, "orders", orderId);
+    const updateData = {
+      status: newStatus,
+      updatedAt: serverTimestamp(),
+      newItemsAdded: true,
+    };
 
-  const updateData = { status };
-  if (status === "Hazır") {
-    updateData.readyAt = serverTimestamp();
+    if (newStatus === "Hazır") {
+      updateData.readyAt = serverTimestamp();
+    }
+
+    await updateDoc(orderRef, updateData);
+    console.log(`✅ ${tableId} - ${orderId} durumu '${newStatus}' olarak güncellendi.`);
+  } catch (e) {
+    console.error("❌ Sipariş durumu güncellenemedi:", e);
+    throw e;
   }
-
-  // Durum değiştiğinde uyarı sıfırlansın
-  updateData.newItemsAdded = false;
-
-  await updateDoc(ref, updateData);
 }
 
-// 🔹 Siparişi geçmişe taşı
+/**
+ * 🔹 Siparişi geçmişe taşır (ödeme alındığında)
+ */
 export async function moveToPastOrders(tableId, orderId, orderData) {
-  const pastRef = doc(db, "tables", tableId, "pastOrders", orderId);
-  await setDoc(pastRef, { ...orderData, movedAt: serverTimestamp() });
-  await deleteDoc(doc(db, "tables", tableId, "orders", orderId));
+  try {
+    const pastRef = doc(db, "tables", tableId, "pastOrders", orderId);
+    await setDoc(pastRef, { ...orderData, movedAt: serverTimestamp() });
+
+    // Eski siparişi sil
+    const currentRef = doc(db, "tables", tableId, "orders", orderId);
+    await deleteDoc(currentRef);
+
+    console.log(`📦 ${tableId} - ${orderId} geçmiş siparişlere taşındı.`);
+  } catch (e) {
+    console.error("❌ Sipariş geçmişe taşınamadı:", e);
+    throw e;
+  }
 }
 
-// 🔹 Masa sepetini güncelle
+/**
+ * 🔹 Firestore’daki masanın cart alanını günceller
+ */
 export async function updateCart(tableId, items, total) {
-  const ref = doc(db, "tables", tableId);
-  await setDoc(ref, { cart: { items, total } }, { merge: true });
+  try {
+    const ref = doc(db, "tables", tableId);
+    await setDoc(ref, { cart: { items, total } }, { merge: true });
+    console.log(`🛒 Cart güncellendi (${tableId})`);
+  } catch (e) {
+    console.error("❌ Cart güncellenemedi:", e);
+  }
 }
