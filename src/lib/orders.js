@@ -21,7 +21,7 @@ export async function submitOrder({ tableId, items, total }) {
       tableId,
       items,
       total,
-      status: "Hazırlanıyor",
+      status: "Yeni", // ✅ DEĞİŞTİRİLDİ
       paymentStatus: "Bekleniyor",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

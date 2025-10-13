@@ -133,7 +133,7 @@ function Waiter() {
       : s === "Teslim Edildi"
       ? "bg-yellow-100"
       : s === "Hazırlanıyor"
-      ? "bg-blue-100"
+      ? "bg-yellow-100"
       : "bg-white";
 
   // ---------------- ACTIONS ----------------
@@ -215,7 +215,10 @@ function Waiter() {
       const ref = doc(db, "tables", tableId);
       const snap = await getDoc(ref);
       if (!snap.exists()) return alert("❌ Bu masa sistemde kayıtlı değil.");
+      
+      // Masa doğrulanırsa siparişi oluştur
       await submitOrder({ tableId, items: cart, total: total(cart) });
+      
       alert(`✅ Sipariş gönderildi (${tableId})`);
       clearCart();
       setTableIdInput("");
@@ -261,6 +264,7 @@ function Waiter() {
         items: editCart,
         total: total(editCart),
         updatedAt: new Date(),
+        newItemsAdded: true,
       });
       alert("✅ Sipariş güncellendi!");
       setShowEditModal(false);
@@ -279,13 +283,23 @@ function Waiter() {
       {/* ÜST BAR */}
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3 border-b pb-2">
         <h2 className="text-2xl font-bold">🧑‍🍳 Garson Paneli</h2>
-        <input
-          type="text"
-          placeholder="Masa numarası ara (örn: 5)"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="border rounded px-3 py-2 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
+        <div className="flex gap-3 w-full sm:w-auto">
+          {/* Yeni Sipariş Butonu EKLENDİ */}
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition font-semibold whitespace-nowrap"
+          >
+            + Yeni Sipariş
+          </button>
+          
+          <input
+            type="text"
+            placeholder="Masa numarası ara (örn: 5)"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border rounded px-3 py-2 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
       </div>
 
       {/* SEKME BUTONLARI */}
