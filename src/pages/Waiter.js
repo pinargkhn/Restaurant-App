@@ -11,6 +11,38 @@ import {
 import { db } from "../lib/firebase";
 import { submitOrder, moveToPastOrders } from "../lib/orders";
 
+// 🔹 Güncellenmiş ve kategorize edilmiş menü listesi
+const MENU_ITEMS = {
+  Yemekler: [
+    { id: 1, name: "Pizza (Büyük)", price: 120 },
+    { id: 2, name: "Hamburger Menü", price: 100 },
+    { id: 3, name: "Lahmacun", price: 60 },
+    { id: 6, name: "Izgara Tavuk", price: 140 },
+    { id: 7, name: "Çiftlik Salatası", price: 75 },
+    { id: 14, name: "Makarna Çeşitleri", price: 85 }, 
+    { id: 15, name: "Sote", price: 130 }, 
+  ],
+  İçecekler: [
+    { id: 4, name: "Ayran", price: 20 },
+    { id: 5, name: "Kola", price: 25 },
+    { id: 8, name: "Şeftali Suyu", price: 35 }, 
+    { id: 9, name: "Su (Şişe)", price: 10 }, 
+    { id: 16, name: "Soda", price: 15 }, 
+    { id: 17, name: "Limonata", price: 40 }, 
+  ],
+  Tatlılar: [
+    { id: 10, name: "Sufle", price: 55 },
+    { id: 11, name: "Kazandibi", price: 45 },
+    { id: 12, name: "Sütlaç", price: 40 }, 
+    { id: 13, name: "Trileçe", price: 65 }, 
+  ],
+};
+const CATEGORIES = Object.keys(MENU_ITEMS);
+
+// Garsonun kullanacağı tekil ürün listesini oluştur
+const allProducts = Object.values(MENU_ITEMS).flat();
+
+
 export default function Waiter() {
   const [orders, setOrders] = useState([]);
   const [pastPaid, setPastPaid] = useState([]);
@@ -22,6 +54,8 @@ export default function Waiter() {
   const [editOrder, setEditOrder] = useState(null);
   const [editCart, setEditCart] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  // 🔹 Yeni: Aktif kategori state'i
+  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0]);
 
   // Yeni Sipariş Modal State'i
   const [showTableInputModal, setShowTableInputModal] = useState(false);
@@ -31,21 +65,14 @@ export default function Waiter() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState("");
 
-  const products = useMemo(
-    () => [
-      { id: 1, name: "Pizza", price: 120 },
-      { id: 2, name: "Hamburger", price: 100 },
-      { id: 3, name: "Kola", price: 30 },
-      { id: 4, name: "Ayran", price: 25 },
-    ],
-    []
-  );
+  // 🔹 Ürünler artık tekil listeden alınıyor
+  const products = useMemo(() => allProducts, []);
 
   // Toplam fiyat artık matematiksel olarak doğru hesaplanıyor
   const total = (arr) =>
     arr.reduce((sum, p) => sum + Number(p.price) * Number(p.qty), 0);
 
-  // ---------------- Firestore ----------------
+  // ---------------- Firestore (Aynı kalır) ----------------
   useEffect(() => {
     const tablesRef = collection(db, "tables");
     const unsubTables = onSnapshot(tablesRef, (tablesSnap) => {
@@ -79,7 +106,7 @@ export default function Waiter() {
     return () => unsubPast();
   }, []);
 
-  // ---------------- Merge helpers ----------------
+  // ---------------- Merge helpers (Aynı kalır) ----------------
   const mergeItems = (orders) => {
     const combined = {};
     orders.forEach((o) =>
@@ -157,7 +184,7 @@ export default function Waiter() {
     );
   }, [activeTab, search, activeOrders, deliveredOrders, paidOrders]);
 
-  // ---------------- Colors ----------------
+  // ---------------- Colors (Aynı kalır) ----------------
   const getBgColor = (o) => {
     if (o.newItemsAdded) return "bg-red-100";
     switch (o.status) {
@@ -170,15 +197,16 @@ export default function Waiter() {
     }
   };
 
-  // ---------------- Edit Modal İşlemleri ----------------
+  // ---------------- Edit Modal İşlemleri (Aynı kalır) ----------------
   const openEditModal = (order) => {
     setEditOrder(order);
     // Mevcut siparişin ürünlerini yüklüyoruz ve miktar güvenliğini sağlıyoruz.
     setEditCart(order.items?.map(p => ({ ...p, qty: Number(p.qty) })) || []);
     setShowEditModal(true);
+    setActiveCategory(CATEGORIES[0]); // Modalı açarken ilk kategoriye dön
   };
   
-  // YENİ SİPARİŞ İŞLEMLERİ: Masa Doğrulama
+  // YENİ SİPARİŞ İŞLEMLERİ: Masa Doğrulama (Aynı kalır)
   const checkTableValidity = async () => {
     if (!newOrderTableId.trim()) return alert("Masa ID'si boş olamaz.");
 
@@ -210,6 +238,7 @@ export default function Waiter() {
     setEditCart([]); // Sepeti boş başlat
     setShowTableInputModal(false);
     setShowEditModal(true);
+    setActiveCategory(CATEGORIES[0]); // Modalı açarken ilk kategoriye dön
   };
 
   const addToEditCart = (product) => {
@@ -260,7 +289,7 @@ export default function Waiter() {
                 tableId: editOrder.tableId,
                 items: editCart,
                 total: total(editCart),
-                // isModification: false, // İlk sipariş olduğu için zorlamaya gerek yok
+                // isModification: false, 
             });
             alert(`✅ ${editOrder.tableId} için yeni sipariş başarıyla oluşturuldu!`);
         } catch (e) {
@@ -299,7 +328,7 @@ export default function Waiter() {
     }
   };
 
-  // ---------------- Teslim Edildi ----------------
+  // ---------------- Teslim Edildi / Ödeme (Aynı kalır) ----------------
   const markDelivered = async (o) => {
     try {
       for (const sub of o.orderDocuments) {
@@ -313,7 +342,6 @@ export default function Waiter() {
     }
   };
 
-  // ---------------- Ödeme ----------------
   const openPayment = (o) => {
     setSelectedOrder(o);
     setShowPaymentModal(true);
@@ -348,6 +376,7 @@ export default function Waiter() {
   // ---------------- Render ----------------
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      {/* ... (Panel Başlık ve Arama alanı aynı kalır) ... */}
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3 border-b pb-2">
         <h2 className="text-2xl font-bold">🧑‍🍳 Garson Paneli</h2>
         
@@ -368,7 +397,7 @@ export default function Waiter() {
         />
       </div>
 
-      {/* Sekmeler */}
+      {/* Sekmeler (Aynı kalır) */}
       <div className="flex border-b border-gray-300 mb-4">
         <button
           onClick={() => setActiveTab("active")}
@@ -396,15 +425,16 @@ export default function Waiter() {
         </button>
       </div>
 
+      {/* Sipariş Listesi (Aynı kalır) */}
       {filteredList.map((o) => (
         <div
           key={o.tableId}
           className={`p-3 border rounded mb-3 ${getBgColor(o)}`}
         >
-          <div className="flex justify-between items-center">
+          {/* ... (Sipariş detayları ve butonlar aynı kalır) ... */}
+           <div className="flex justify-between items-center">
             <p className="font-semibold">
               Masa: {o.tableId}
-              {/* Ödemesi alınanlar sekmesinde sipariş durumu göstermiyoruz */}
               {activeTab !== 'paid' && (
                 <span className="text-sm text-gray-500 ml-2">
                   ({o.status})
@@ -414,7 +444,6 @@ export default function Waiter() {
             <p className="font-semibold">{o.total} ₺</p>
           </div>
 
-          {/* Uyarı sadece Aktif/Teslim Edilenler sekmesinde görünür */}
           {o.newItemsAdded && activeTab !== 'paid' && (
             <p className="text-red-600 text-sm font-semibold mt-1 animate-pulse">
               ⚠️ Yeni ürün eklendi – Mutfaktan onay bekleniyor
@@ -426,7 +455,6 @@ export default function Waiter() {
             {o.items?.map((i) => `${i.name} ×${i.qty}`).join(", ")}
           </p>
 
-          {/* Butonları sadece Aktif ve Teslim Edilenler sekmesinde göster */}
           {activeTab !== 'paid' && (
             <div className="flex gap-2 mt-3">
               <button
@@ -470,10 +498,28 @@ export default function Waiter() {
               {editOrder.isNewOrder ? "➕ Yeni Sipariş Oluştur" : "✏️ Siparişi Düzenle"} ({editOrder.tableId})
             </h3>
 
-            {/* YENİ ÜRÜN EKLEME ALANI */}
-            <h4 className="font-semibold mb-2">Ürün Ekle</h4>
+            {/* 🔹 KATEGORİ SEKMELERİ */}
+            <div className="flex border-b border-gray-300 mb-4 overflow-x-auto whitespace-nowrap">
+              {CATEGORIES.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => setActiveCategory(category)}
+                  className={`px-3 py-2 text-sm font-semibold transition-colors ${
+                    activeCategory === category
+                      ? "border-b-2 border-blue-600 text-blue-600"
+                      : "text-gray-600 hover:text-blue-500"
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+
+            {/* YENİ ÜRÜN EKLEME ALANI (Aktif Kategoriye Göre Filtrelenir) */}
+            <h4 className="font-semibold mb-2">Ürün Ekle ({activeCategory})</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 border-b pb-4">
-              {products.map((p) => (
+              {/* Sadece aktif kategoriye ait ürünleri göster */}
+              {MENU_ITEMS[activeCategory]?.map((p) => (
                 <div
                   key={p.id}
                   className="border rounded p-3 flex flex-col justify-between bg-gray-50 shadow-sm"
@@ -494,6 +540,7 @@ export default function Waiter() {
 
             <div className="pt-3">
               <h4 className="font-semibold mb-2">Sepet ({editOrder.isNewOrder ? "Yeni Sipariş" : "Mevcut + Yeni Ürünler"})</h4>
+              {/* ... (Sepet kısmı aynı kalır) ... */}
               {editCart.length === 0 ? (
                 <p className="text-gray-500 text-sm">Sepet boş.</p>
               ) : (
@@ -544,7 +591,7 @@ export default function Waiter() {
         </div>
       )}
 
-      {/* Masa ID Giriş Modalı */}
+      {/* Masa ID Giriş Modalı (Aynı kalır) */}
       {showTableInputModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-sm relative">
@@ -576,7 +623,7 @@ export default function Waiter() {
         </div>
       )}
 
-      {/* Ödeme Modalı */}
+      {/* Ödeme Modalı (Aynı kalır) */}
       {showPaymentModal && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
