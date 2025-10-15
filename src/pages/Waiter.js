@@ -10,38 +10,72 @@ import {
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { submitOrder, moveToPastOrders } from "../lib/orders";
+import useProducts from "../hooks/useProducts"; // ✅ Hook kullanılıyor
 
-// 🔹 Güncellenmiş ve kategorize edilmiş menü listesi
-const MENU_ITEMS = {
-  Yemekler: [
-    { id: 1, name: "Pizza (Büyük)", price: 120 },
-    { id: 2, name: "Hamburger Menü", price: 100 },
-    { id: 3, name: "Lahmacun", price: 60 },
-    { id: 6, name: "Izgara Tavuk", price: 140 },
-    { id: 7, name: "Çiftlik Salatası", price: 75 },
-    { id: 14, name: "Makarna Çeşitleri", price: 85 }, 
-    { id: 15, name: "Sote", price: 130 }, 
-  ],
-  İçecekler: [
-    { id: 4, name: "Ayran", price: 20 },
-    { id: 5, name: "Kola", price: 25 },
-    { id: 8, name: "Şeftali Suyu", price: 35 }, 
-    { id: 9, name: "Su (Şişe)", price: 10 }, 
-    { id: 16, name: "Soda", price: 15 }, 
-    { id: 17, name: "Limonata", price: 40 }, 
-  ],
-  Tatlılar: [
-    { id: 10, name: "Sufle", price: 55 },
-    { id: 11, name: "Kazandibi", price: 45 },
-    { id: 12, name: "Sütlaç", price: 40 }, 
-    { id: 13, name: "Trileçe", price: 65 }, 
-  ],
+// -------------------------------------------------------------
+// 🔹 HELPER FONKSİYONLAR (Aynı kalır)
+// -------------------------------------------------------------
+const mergeItems = (orders) => {
+    const combined = {};
+    orders.forEach((o) =>
+      (o.items || []).forEach((it) => {
+        const qty = Number(it.qty) || 0;
+        if (combined[it.id]) combined[it.id].qty += qty;
+        else combined[it.id] = { ...it, qty };
+      })
+    );
+    return Object.values(combined);
 };
-const CATEGORIES = Object.keys(MENU_ITEMS);
 
-// Garsonun kullanacağı tekil ürün listesini oluştur
-const allProducts = Object.values(MENU_ITEMS).flat();
+const getMergedStatus = (orders) => {
+    if (orders.every((o) => o.status === "Teslim Edildi")) return "Teslim Edildi";
+    if (orders.some((o) => o.status === "Hazır")) return "Hazır";
+    if (orders.some((o) => o.status === "Hazırlanıyor")) return "Hazırlanıyor";
+    return "Yeni";
+};
 
+const getMergedNewItemsAdded = (orders) =>
+    orders.some((o) => o.newItemsAdded === true);
+
+const mergeOrdersByTable = (all) => {
+    const nonPaid = all.filter((o) => o.paymentStatus !== "Alındı");
+    const grouped = nonPaid.reduce((a, o) => {
+      (a[o.tableId] ||= []).push(o);
+      return a;
+    }, {});
+    return Object.entries(grouped).map(([tableId, list]) => {
+      const latest = list.sort(
+        (a, b) =>
+          (b.updatedAt?.seconds || b.createdAt?.seconds || 0) -
+          (a.updatedAt?.seconds || a.createdAt?.seconds || 0)
+      )[0];
+      return {
+        tableId,
+        id: list.map((x) => x.id),
+        orderDocuments: list,
+        items: mergeItems(list),
+        status: getMergedStatus(list),
+        newItemsAdded: getMergedNewItemsAdded(list),
+        total: list.reduce((sum, o) => sum + (o.total || 0), 0),
+        createdAt: latest.createdAt,
+        updatedAt: latest.updatedAt,
+      };
+    });
+};
+
+const getBgColor = (o) => {
+    if (o.newItemsAdded) return "bg-red-100";
+    switch (o.status) {
+      case "Hazır":
+        return "bg-green-100";
+      case "Hazırlanıyor":
+        return "bg-yellow-100";
+      default:
+        return "bg-white";
+    }
+};
+
+// -------------------------------------------------------------
 
 export default function Waiter() {
   const [orders, setOrders] = useState([]);
@@ -49,30 +83,27 @@ export default function Waiter() {
   const [activeTab, setActiveTab] = useState("active");
   const [search, setSearch] = useState("");
 
-  // modal state
+  // 🔹 useProducts Hook'u (Menü verisi)
+  const { allProducts: menuProducts, loading: loadingProducts, products: groupedProducts, categories: CATEGORIES } = useProducts(); 
+
+  // Modal State'leri
   const [showEditModal, setShowEditModal] = useState(false);
   const [editOrder, setEditOrder] = useState(null);
-  const [editCart, setEditCart] = useState([]);
+  const [editCart, setEditCart] = useState([]); 
   const [isSaving, setIsSaving] = useState(false);
-  // 🔹 Yeni: Aktif kategori state'i
-  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0]);
+  const [activeCategory, setActiveCategory] = useState(""); 
 
-  // Yeni Sipariş Modal State'i
+  // Yeni Sipariş State'leri
   const [showTableInputModal, setShowTableInputModal] = useState(false);
-  const [newOrderTableId, setNewOrderTableId] = useState("");
+  const [newOrderTableId, setNewTableId] = useState("");
+  const [newOrderCart, setNewOrderCart] = useState([]); 
 
+  // Ödeme State'leri
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState("");
-
-  // 🔹 Ürünler artık tekil listeden alınıyor
-  const products = useMemo(() => allProducts, []);
-
-  // Toplam fiyat artık matematiksel olarak doğru hesaplanıyor
-  const total = (arr) =>
-    arr.reduce((sum, p) => sum + Number(p.price) * Number(p.qty), 0);
-
-  // ---------------- Firestore (Aynı kalır) ----------------
+  
+  // ---------------- FIRESTORE DİNLEME (Aynı kalır) ----------------
   useEffect(() => {
     const tablesRef = collection(db, "tables");
     const unsubTables = onSnapshot(tablesRef, (tablesSnap) => {
@@ -106,64 +137,15 @@ export default function Waiter() {
     return () => unsubPast();
   }, []);
 
-  // ---------------- Merge helpers (Aynı kalır) ----------------
-  const mergeItems = (orders) => {
-    const combined = {};
-    orders.forEach((o) =>
-      (o.items || []).forEach((it) => {
-        // Miktar toplarken her zaman sayıya çevir
-        const qty = Number(it.qty) || 0;
-        if (combined[it.id]) combined[it.id].qty += qty;
-        else combined[it.id] = { ...it, qty };
-      })
-    );
-    return Object.values(combined);
-  };
-
-  const getMergedStatus = (orders) => {
-    if (orders.every((o) => o.status === "Teslim Edildi")) return "Teslim Edildi";
-    if (orders.some((o) => o.status === "Hazır")) return "Hazır";
-    if (orders.some((o) => o.status === "Hazırlanıyor")) return "Hazırlanıyor";
-    return "Yeni";
-  };
-
-  const getMergedNewItemsAdded = (orders) =>
-    orders.some((o) => o.newItemsAdded === true);
-
-  const mergeOrdersByTable = (all) => {
-    const nonPaid = all.filter((o) => o.paymentStatus !== "Alındı");
-    const grouped = nonPaid.reduce((a, o) => {
-      (a[o.tableId] ||= []).push(o);
-      return a;
-    }, {});
-    return Object.entries(grouped).map(([tableId, list]) => {
-      const latest = list.sort(
-        (a, b) =>
-          (b.updatedAt?.seconds || b.createdAt?.seconds || 0) -
-          (a.updatedAt?.seconds || a.createdAt?.seconds || 0)
-      )[0];
-      return {
-        tableId,
-        id: list.map((x) => x.id),
-        orderDocuments: list,
-        items: mergeItems(list), // MergeItems artık güvenli sayı döndürüyor
-        status: getMergedStatus(list),
-        newItemsAdded: getMergedNewItemsAdded(list),
-        total: list.reduce((sum, o) => sum + (o.total || 0), 0),
-        createdAt: latest.createdAt,
-        updatedAt: latest.updatedAt,
-      };
-    });
-  };
-
+  // ---------------- VERİ BİRLEŞTİRME VE FİLTRELEME (Aynı kalır) ----------------
   const mergedOrders = useMemo(() => mergeOrdersByTable(orders), [orders]);
 
-  const activeOrders = useMemo(
-    () => mergedOrders.filter((o) => o.status !== "Teslim Edildi"),
-    [mergedOrders]
-  );
   const deliveredOrders = useMemo(
     () => mergedOrders.filter((o) => o.status === "Teslim Edildi"),
+    [mergedOrders]
+  );
+  const activeOrders = useMemo(
+    () => mergedOrders.filter((o) => o.status !== "Teslim Edildi"),
     [mergedOrders]
   );
   const paidOrders = useMemo(
@@ -183,152 +165,92 @@ export default function Waiter() {
       o.tableId?.toLowerCase().includes(search.trim().toLowerCase())
     );
   }, [activeTab, search, activeOrders, deliveredOrders, paidOrders]);
+  
+  // ---------------- Yeni Sipariş / Düzenleme Fonksiyonları (Menü ile uyumlu) ----------------
+  
+  const calculateTotal = (arr) =>
+      arr.reduce((acc, item) => acc + (Number(item.qty) || 0) * (Number(item.price) || 0), 0);
 
-  // ---------------- Colors (Aynı kalır) ----------------
-  const getBgColor = (o) => {
-    if (o.newItemsAdded) return "bg-red-100";
-    switch (o.status) {
-      case "Hazır":
-        return "bg-green-100";
-      case "Hazırlanıyor":
-        return "bg-yellow-100";
-      default:
-        return "bg-white";
-    }
-  };
-
-  // ---------------- Edit Modal İşlemleri (Aynı kalır) ----------------
-  const openEditModal = (order) => {
-    setEditOrder(order);
-    // Mevcut siparişin ürünlerini yüklüyoruz ve miktar güvenliğini sağlıyoruz.
-    setEditCart(order.items?.map(p => ({ ...p, qty: Number(p.qty) })) || []);
-    setShowEditModal(true);
-    setActiveCategory(CATEGORIES[0]); // Modalı açarken ilk kategoriye dön
+  // 🔹 Yeni sipariş sepetine ürün ekle
+  const addNewItemToCart = (item) => {
+    const existing = newOrderCart.find(p => p.id === item.id);
+    const newItems = existing
+      ? newOrderCart.map(p => p.id === item.id ? { ...p, qty: Number(p.qty) + 1, price: Number(p.price) } : p)
+      : [...newOrderCart, { ...item, qty: 1, price: Number(item.price), name: item.name }]; // name, price eklendi
+    setNewOrderCart(newItems);
   };
   
-  // YENİ SİPARİŞ İŞLEMLERİ: Masa Doğrulama (Aynı kalır)
-  const checkTableValidity = async () => {
-    if (!newOrderTableId.trim()) return alert("Masa ID'si boş olamaz.");
-
-    try {
-      const idToValidate = newOrderTableId.trim();
-      const ref = doc(db, "tables", idToValidate);
-      const snap = await getDoc(ref);
-
-      if (!snap.exists()) {
-        alert(`❌ Hata: ${idToValidate} adlı masa sistemde kayıtlı değil.`);
-        return;
-      }
-      
-      // Masa geçerliyse, sipariş modalını aç
-      openNewOrderModal(idToValidate);
-    } catch (e) {
-      console.error("Masa doğrulama hatası:", e);
-      alert("Sunucu hatası oluştu. Lütfen tekrar deneyin.");
-    }
+  // 🔹 Düzenleme sepetine ürün ekle
+  const addEditItemToCart = (item) => {
+    const existing = editCart.find(p => p.id === item.id);
+    const newItems = existing
+      ? editCart.map(p => p.id === item.id ? { ...p, qty: Number(p.qty) + 1, price: Number(p.price) } : p)
+      : [...editCart, { ...item, qty: 1, price: Number(item.price), name: item.name }]; // name, price eklendi
+    setEditCart(newItems);
   };
+  
+  const newOrderTotal = useMemo(() => calculateTotal(newOrderCart), [newOrderCart]);
+  const editOrderTotal = useMemo(() => calculateTotal(editCart), [editCart]);
 
-  const openTableInputModal = () => {
-    setNewOrderTableId("");
-    setShowTableInputModal(true);
-  };
-
-  const openNewOrderModal = (tableId) => {
-    setEditOrder({ tableId: tableId, orderDocuments: [], isNewOrder: true });
-    setEditCart([]); // Sepeti boş başlat
-    setShowTableInputModal(false);
-    setShowEditModal(true);
-    setActiveCategory(CATEGORIES[0]); // Modalı açarken ilk kategoriye dön
-  };
-
-  const addToEditCart = (product) => {
-    setEditCart((prev) => {
-      const existing = prev.find((p) => p.id === product.id);
-      
-      return existing
-        ? prev.map((p) =>
-            p.id === product.id
-              ? { ...p, qty: Number(p.qty) + 1 } 
-              : p
-          )
-        : [...prev, { ...product, qty: 1 }];
-    });
-  };
-
-  const increaseQty = (id) =>
-    setEditCart((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, qty: Number(p.qty) + 1 } 
-          : p
-      )
-    );
-
-  const decreaseQty = (id) =>
-    setEditCart((prev) =>
-      prev
-        .map((p) =>
-          p.id === id
-            ? { ...p, qty: Math.max(0, Number(p.qty) - 1) } 
-            : p
-        )
-        .filter((p) => p.qty > 0)
-    );
-
-  const removeFromEditCart = (id) =>
-    setEditCart((prev) => prev.filter((p) => p.id !== id));
-
-  const saveEditedOrder = async () => {
-    if (!editOrder || editCart.length === 0) return;
-    setIsSaving(true);
+  const handleNewOrderSubmit = async () => {
+    if (!newOrderTableId || newOrderCart.length === 0) return;
     
-    // Yeni Sipariş ise: Sadece submit et
-    if (editOrder.isNewOrder) {
-        try {
-            await submitOrder({
-                tableId: editOrder.tableId,
-                items: editCart,
-                total: total(editCart),
-                // isModification: false, 
-            });
-            alert(`✅ ${editOrder.tableId} için yeni sipariş başarıyla oluşturuldu!`);
-        } catch (e) {
-            console.error("❌ Yeni sipariş oluşturma başarısız:", e);
-            alert("❌ Yeni sipariş oluşturma başarısız!");
-        } finally {
-            setIsSaving(false);
-            setShowEditModal(false);
-            return;
-        }
-    }
-
-    // Mevcut Sipariş Düzenlemesi ise: Sil ve yeniden kaydet (Uyarıyı tetikle)
     try {
-      // 1. ADIM: Mevcut aktif alt sipariş belgelerini sil
-      for (const sub of editOrder.orderDocuments) {
-        const ref = doc(db, "tables", editOrder.tableId, "orders", sub.id);
-        await deleteDoc(ref);
-      }
-      
-      // 2. ADIM: Güncel sepet içeriğini tek BİR YENİ sipariş belgesi olarak kaydet
-      await submitOrder({
-        tableId: editOrder.tableId,
-        items: editCart,
-        total: total(editCart),
-        isModification: true, // ✅ KRİTİK: Düzenleme yapıldığını belirtiyoruz
-      });
+        const tableRef = doc(db, "tables", newOrderTableId);
+        const tableSnap = await getDoc(tableRef);
+        if (!tableSnap.exists()) {
+             alert(`❌ Hata: ${newOrderTableId} adlı masa sistemde kayıtlı değil.`);
+             return;
+        }
 
-      alert(`✅ ${editOrder.tableId} masasının siparişi başarıyla güncellendi (Azaltma/Silme dahil).`);
+        await submitOrder({ 
+            tableId: newOrderTableId, 
+            items: newOrderCart, 
+            total: newOrderTotal 
+        });
+        setNewOrderCart([]);
+        setNewTableId("");
+        setShowTableInputModal(false);
+        alert(`✅ ${newOrderTableId} için sipariş başarıyla oluşturuldu!`);
     } catch (e) {
-      console.error("❌ Güncelleme başarısız:", e);
-      alert("❌ Güncelleme başarısız! Console'u kontrol et.");
-    } finally {
-      setIsSaving(false);
-      setShowEditModal(false);
+        console.error("Yeni sipariş hatası:", e);
+        alert("❌ Yeni sipariş oluşturulamadı.");
     }
   };
 
-  // ---------------- Teslim Edildi / Ödeme (Aynı kalır) ----------------
+  const handleEditOrderSave = async () => {
+      if (!editOrder || editCart.length === 0) return;
+
+      setIsSaving(true);
+      try {
+          // Önceki tüm alt belgeleri sil ve yeni, güncellenmiş tek bir sipariş belgesi gönder
+          for (const sub of editOrder.orderDocuments) {
+              const ref = doc(db, "tables", editOrder.tableId, "orders", sub.id);
+              await deleteDoc(ref);
+          }
+          
+          await submitOrder({
+              tableId: editOrder.tableId,
+              items: editCart,
+              total: editOrderTotal,
+              isModification: true, 
+          });
+
+          setShowEditModal(false);
+          setEditOrder(null);
+          setEditCart([]);
+          alert("✅ Sipariş başarıyla düzenlendi ve mutfağa gönderildi.");
+
+      } catch (e) {
+          console.error("Sipariş düzenleme hatası:", e);
+          alert("❌ Sipariş düzenlenirken bir hata oluştu.");
+      } finally {
+          setIsSaving(false);
+      }
+  };
+  
+  // ---------------- Diğer Garson İşlevleri (Teslim Etme/Ödeme) ----------------
+  
   const markDelivered = async (o) => {
     try {
       for (const sub of o.orderDocuments) {
@@ -372,299 +294,332 @@ export default function Waiter() {
       setPaymentMethod("");
     }
   };
-
-  // ---------------- Render ----------------
+  
+  // ---------------- Modal Açılış Fonksiyonları ----------------
+  
+  const openTableInputModal = () => {
+    setNewTableId("");
+    setNewOrderCart([]);
+    setActiveCategory(CATEGORIES[0] || "");
+    setShowTableInputModal(true);
+  };
+  
+  const openEditModal = (order) => {
+    setEditOrder(order);
+    // Mevcut sipariş öğelerini price ve qty'yi Number yaparak yüklüyoruz
+    setEditCart(order.items?.map(p => ({ ...p, qty: Number(p.qty), price: Number(p.price) })) || []);
+    setActiveCategory(CATEGORIES[0] || "");
+    setShowEditModal(true);
+  };
+  
+  // ---------------- RENDER ----------------
+  
+  if (loadingProducts) {
+      return (
+        <div className="flex items-center justify-center h-screen text-lg font-semibold text-gray-600">
+          Menü verileri yükleniyor...
+        </div>
+      );
+  }
+  
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* ... (Panel Başlık ve Arama alanı aynı kalır) ... */}
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3 border-b pb-2">
-        <h2 className="text-2xl font-bold">🧑‍🍳 Garson Paneli</h2>
-        
-        {/* Yeni Sipariş Butonu */}
-        <button 
-            onClick={openTableInputModal}
-            className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 font-semibold transition"
-        >
-            ➕ Yeni Sipariş Başlat
-        </button>
-
-        <input
-          type="text"
-          placeholder="Masa ara..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="border rounded px-3 py-2 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
-      </div>
-
-      {/* Sekmeler (Aynı kalır) */}
-      <div className="flex border-b border-gray-300 mb-4">
-        <button
-          onClick={() => setActiveTab("active")}
-          className={`px-4 py-2 font-semibold ${
-            activeTab === "active" ? "border-b-2 border-blue-600" : ""
-          }`}
-        >
-          Aktif Siparişler
-        </button>
-        <button
-          onClick={() => setActiveTab("delivered")}
-          className={`px-4 py-2 font-semibold ${
-            activeTab === "delivered" ? "border-b-2 border-blue-600" : ""
-          }`}
-        >
-          Teslim Edilenler
-        </button>
-        <button
-          onClick={() => setActiveTab("paid")}
-          className={`px-4 py-2 font-semibold ${
-            activeTab === "paid" ? "border-b-2 border-blue-600" : ""
-          }`}
-        >
-          Ödemesi Alınanlar
-        </button>
-      </div>
-
-      {/* Sipariş Listesi (Aynı kalır) */}
-      {filteredList.map((o) => (
-        <div
-          key={o.tableId}
-          className={`p-3 border rounded mb-3 ${getBgColor(o)}`}
-        >
-          {/* ... (Sipariş detayları ve butonlar aynı kalır) ... */}
-           <div className="flex justify-between items-center">
-            <p className="font-semibold">
-              Masa: {o.tableId}
-              {activeTab !== 'paid' && (
-                <span className="text-sm text-gray-500 ml-2">
-                  ({o.status})
-                </span>
-              )}
-            </p>
-            <p className="font-semibold">{o.total} ₺</p>
-          </div>
-
-          {o.newItemsAdded && activeTab !== 'paid' && (
-            <p className="text-red-600 text-sm font-semibold mt-1 animate-pulse">
-              ⚠️ Yeni ürün eklendi – Mutfaktan onay bekleniyor
-            </p>
-          )}
-
-          <p className="text-sm text-gray-700 mt-1">
-            <strong>Ürünler:</strong>{" "}
-            {o.items?.map((i) => `${i.name} ×${i.qty}`).join(", ")}
-          </p>
-
-          {activeTab !== 'paid' && (
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => openEditModal(o)}
-                className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-              >
-                ✏️ Düzenle
-              </button>
-              {o.status !== "Teslim Edildi" && (
-                <button
-                  onClick={() => markDelivered(o)}
-                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-                >
-                  🚚 Teslim Edildi
-                </button>
-              )}
-              {o.status === "Teslim Edildi" && (
-                <button
-                  onClick={() => openPayment(o)}
-                  className="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
-                >
-                  💰 Ödeme Al
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
-
-      {/* Düzenleme/Yeni Sipariş Modalı */}
-      {showEditModal && editOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl relative">
-            <button
-              onClick={() => setShowEditModal(false)}
-              className="absolute top-2 right-3 text-gray-600 hover:text-black text-xl"
+    <div className="p-6 max-w-7xl mx-auto">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3 border-b pb-2">
+            <h2 className="text-2xl font-bold">🧑‍🍳 Garson Paneli</h2>
+            <button 
+                onClick={openTableInputModal}
+                className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 font-semibold transition"
             >
-              ✕
+                ➕ Yeni Sipariş Başlat
             </button>
-            <h3 className="text-xl font-bold mb-4">
-              {editOrder.isNewOrder ? "➕ Yeni Sipariş Oluştur" : "✏️ Siparişi Düzenle"} ({editOrder.tableId})
-            </h3>
-
-            {/* 🔹 KATEGORİ SEKMELERİ */}
-            <div className="flex border-b border-gray-300 mb-4 overflow-x-auto whitespace-nowrap">
-              {CATEGORIES.map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  className={`px-3 py-2 text-sm font-semibold transition-colors ${
-                    activeCategory === category
-                      ? "border-b-2 border-blue-600 text-blue-600"
-                      : "text-gray-600 hover:text-blue-500"
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-
-            {/* YENİ ÜRÜN EKLEME ALANI (Aktif Kategoriye Göre Filtrelenir) */}
-            <h4 className="font-semibold mb-2">Ürün Ekle ({activeCategory})</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 border-b pb-4">
-              {/* Sadece aktif kategoriye ait ürünleri göster */}
-              {MENU_ITEMS[activeCategory]?.map((p) => (
-                <div
-                  key={p.id}
-                  className="border rounded p-3 flex flex-col justify-between bg-gray-50 shadow-sm"
-                >
-                  <div>
-                    <h4 className="font-semibold">{p.name}</h4>
-                    <p className="text-gray-600 text-sm">{p.price} ₺</p>
-                  </div>
-                  <button
-                    onClick={() => addToEditCart(p)}
-                    className="mt-2 bg-blue-600 text-white py-1 rounded hover:bg-blue-700"
-                  >
-                    Ekle
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-3">
-              <h4 className="font-semibold mb-2">Sepet ({editOrder.isNewOrder ? "Yeni Sipariş" : "Mevcut + Yeni Ürünler"})</h4>
-              {/* ... (Sepet kısmı aynı kalır) ... */}
-              {editCart.length === 0 ? (
-                <p className="text-gray-500 text-sm">Sepet boş.</p>
-              ) : (
-                editCart.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex justify-between items-center mb-2 text-sm"
-                  >
-                    <span>
-                      {p.name} × {p.qty}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => decreaseQty(p.id)}
-                        className="bg-gray-200 px-2"
-                      >
-                        −
-                      </button>
-                      <button
-                        onClick={() => increaseQty(p.id)}
-                        className="bg-gray-200 px-2"
-                      >
-                        +
-                      </button>
-                      <button
-                        onClick={() => removeFromEditCart(p.id)}
-                        className="text-red-600"
-                      >
-                        Sil
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="flex justify-between items-center mt-4 border-t pt-3">
-              <strong>Toplam: {total(editCart)} ₺</strong>
-              <button
-                onClick={saveEditedOrder}
-                disabled={isSaving || editCart.length === 0}
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
-              >
-                {editOrder.isNewOrder ? "Siparişi Oluştur" : "Kaydet"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Masa ID Giriş Modalı (Aynı kalır) */}
-      {showTableInputModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-sm relative">
-            <h3 className="text-xl font-bold mb-4 text-center">Yeni Sipariş Masa ID</h3>
-            
             <input
                 type="text"
-                placeholder="Masa ID girin (Örn: masa_1, A1)"
-                value={newOrderTableId}
-                onChange={(e) => setNewOrderTableId(e.target.value)}
-                className="border p-2 rounded w-full mb-4 text-center"
+                placeholder="Masa ara..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="border rounded px-3 py-2 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-            
-            <button
-                onClick={checkTableValidity}
-                disabled={!newOrderTableId.trim()}
-                className="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60 mb-2"
-            >
-                Siparişi Başlat
-            </button>
-            
-            <button
-              className="w-full text-gray-500 hover:text-black mt-2"
-              onClick={() => setShowTableInputModal(false)}
-            >
-              İptal
-            </button>
-          </div>
         </div>
-      )}
 
-      {/* Ödeme Modalı (Aynı kalır) */}
-      {showPaymentModal && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
-            <h3 className="text-xl font-bold mb-4">💰 Ödeme Yöntemi Seç</h3>
-            <p className="mb-4 text-gray-700">
-              Masa: <strong>{selectedOrder.tableId}</strong>
-              <br />
-              Toplam: <strong>{selectedOrder.total} ₺</strong>
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                onClick={() => {
-                  setPaymentMethod("Kart");
-                  confirmPayment();
-                }}
-              >
-                💳 Kredi/Banka Kartı
-              </button>
-              <button
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                onClick={() => {
-                  setPaymentMethod("Nakit");
-                  confirmPayment();
-                }}
-              >
-                💵 Nakit
-              </button>
-            </div>
+        {/* Sekmeler (Aktif, Teslim Edilenler, Ödemesi Alınanlar) */}
+        <div className="flex border-b border-gray-300 mb-4">
             <button
-              className="mt-4 text-gray-500 hover:text-black"
-              onClick={() => {
-                setShowPaymentModal(false);
-                setSelectedOrder(null);
-              }}
+                onClick={() => setActiveTab("active")}
+                className={`px-4 py-2 font-semibold ${
+                  activeTab === "active" ? "border-b-2 border-blue-600" : ""
+                }`}
             >
-              İptal
+                Aktif Siparişler
             </button>
-          </div>
+            <button
+                onClick={() => setActiveTab("delivered")}
+                className={`px-4 py-2 font-semibold ${
+                  activeTab === "delivered" ? "border-b-2 border-blue-600" : ""
+                }`}
+            >
+                Teslim Edilenler
+            </button>
+            <button
+                onClick={() => setActiveTab("paid")}
+                className={`px-4 py-2 font-semibold ${
+                  activeTab === "paid" ? "border-b-2 border-blue-600" : ""
+                }`}
+            >
+                Ödemesi Alınanlar
+            </button>
         </div>
-      )}
+
+        {/* Sipariş Listesi */}
+        {filteredList.map((o) => (
+            <div 
+                key={o.tableId} 
+                className={`p-3 border rounded mb-3 ${getBgColor(o)}`} 
+            >
+                <div className="flex justify-between items-center">
+                    <p className="font-semibold">
+                        Masa: {o.tableId}
+                        {activeTab !== 'paid' && (
+                            <span className="text-sm text-gray-500 ml-2">
+                                ({o.status})
+                            </span>
+                        )}
+                    </p>
+                    <p className="font-semibold">{o.total} ₺</p>
+                </div>
+                
+                {/* UYARI ÖZELLİĞİ */}
+                {o.newItemsAdded && activeTab !== 'paid' && (
+                    <p className="text-red-600 text-sm font-semibold mt-1 animate-pulse">
+                        ⚠️ Yeni ürün eklendi – Mutfaktan onay bekleniyor
+                    </p>
+                )}
+
+                <p className="text-sm text-gray-700 mt-1">
+                    <strong>Ürünler:</strong>{" "}
+                    {o.items?.map((i) => `${i.name} ×${i.qty}`).join(", ")}
+                </p>
+
+                {/* Butonlar */}
+                {activeTab !== 'paid' && (
+                    <div className="flex gap-2 mt-3">
+                        <button
+                            onClick={() => openEditModal(o)}
+                            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                        >
+                            ✏️ Düzenle
+                        </button>
+                        {o.status !== "Teslim Edildi" && (
+                            <button
+                                onClick={() => markDelivered(o)}
+                                className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                            >
+                                🚚 Teslim Edildi
+                            </button>
+                        )}
+                        {o.status === "Teslim Edildi" && (
+                            <button
+                                onClick={() => openPayment(o)}
+                                className="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
+                            >
+                                💰 Ödeme Al
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+        ))}
+
+
+        {/* Yeni Sipariş Oluşturma Modalı - Table Input */}
+        {showTableInputModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md max-h-[90vh] flex flex-col">
+              <h3 className="text-xl font-bold mb-4">Yeni Sipariş Oluştur</h3>
+              <input
+                type="text"
+                placeholder="Masa ID (Örn: masa_7)"
+                value={newOrderTableId}
+                onChange={(e) => setNewTableId(e.target.value)}
+                className="w-full border p-2 rounded mb-4"
+              />
+              
+              {/* Kategori Sekmeleri */}
+              <div className="flex overflow-x-auto border-b mb-3">
+                {CATEGORIES.map(category => (
+                  <button key={category} 
+                          onClick={() => setActiveCategory(category)}
+                          className={`px-3 py-1 text-sm font-semibold ${activeCategory === category ? 'border-b-2 border-blue-600' : 'text-gray-600'}`}>
+                    {category}
+                  </button>
+                ))}
+              </div>
+
+              {/* ÜRÜN SEÇİM ALANI */}
+              <div className="flex-1 overflow-y-auto mb-4 border p-2 rounded">
+                <h4 className="font-semibold mb-2">Ürün Ekle ({activeCategory})</h4>
+                <div className="space-y-1">
+                    {(groupedProducts[activeCategory] || []).map((item) => (
+                      <div key={item.id} className="flex justify-between items-center py-1 border-b last:border-b-0">
+                        <span>{item.name} ({item.price} ₺)</span>
+                        <button
+                          onClick={() => addNewItemToCart(item)}
+                          className="bg-blue-500 text-white text-xs px-2 py-1 rounded hover:bg-blue-600"
+                        >
+                          + Ekle
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+              
+              {/* Sepet ve Toplam */}
+              <div className="flex-shrink-0 border-t pt-3">
+                <h4 className="font-semibold mb-2">Sepet ({newOrderTotal.toFixed(2)} ₺)</h4>
+                <ul className="list-disc ml-5 text-sm max-h-20 overflow-y-auto">
+                    {newOrderCart.map(item => (
+                        <li key={item.id}>{item.name} x{item.qty}</li>
+                    ))}
+                </ul>
+                
+                <div className="flex gap-2 mt-4">
+                  <button
+                    className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
+                    onClick={handleNewOrderSubmit}
+                    disabled={!newOrderTableId || newOrderCart.length === 0}
+                  >
+                    Siparişi Oluştur
+                  </button>
+                  <button
+                    className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+                    onClick={() => setShowTableInputModal(false)}
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Sipariş Düzenleme Modalı */}
+        {showEditModal && editOrder && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+             <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl relative max-h-[90vh] flex flex-col">
+                <button
+                    onClick={() => setShowEditModal(false)}
+                    className="absolute top-2 right-3 text-gray-600 hover:text-black text-xl z-30"
+                >
+                    ✕
+                </button>
+                <h3 className="text-xl font-bold mb-4">Sipariş Düzenle: {editOrder.tableId}</h3>
+                
+                {/* Kategori Sekmeleri */}
+                <div className="flex overflow-x-auto border-b mb-3">
+                    {CATEGORIES.map(category => (
+                      <button key={category} 
+                              onClick={() => setActiveCategory(category)}
+                              className={`px-3 py-1 text-sm font-semibold ${activeCategory === category ? 'border-b-2 border-blue-600' : 'text-gray-600'}`}>
+                        {category}
+                      </button>
+                    ))}
+                </div>
+
+                {/* ÜRÜN SEÇİM ALANI (Kaydırılabilir) */}
+                <div className="flex-1 overflow-y-auto mb-4 border p-2 rounded">
+                    <h4 className="font-semibold mb-2">Menüden Ürün Ekle ({activeCategory})</h4>
+                    <div className="space-y-1">
+                        {(groupedProducts[activeCategory] || []).map((item) => (
+                          <div key={item.id} className="flex justify-between items-center py-1 border-b last:border-b-0">
+                            <span>{item.name} ({item.price} ₺)</span>
+                            <button
+                              onClick={() => addEditItemToCart(item)}
+                              className="bg-blue-500 text-white text-xs px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                              + Ekle
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+
+                    {/* MEVCUT SEPET DURUMU */}
+                    <h4 className="font-semibold mt-4 mb-2 border-t pt-2">Düzenlenen Sepet ({editOrderTotal.toFixed(2)} ₺)</h4>
+                    <ul className="space-y-2 max-h-40 overflow-y-auto border p-2 rounded text-sm">
+                      {editCart.map(item => (
+                        <li key={item.id} className="flex justify-between items-center">
+                          <span>{item.name} x{item.qty} ({item.qty * item.price} ₺)</span>
+                          <div>
+                            <button className="bg-gray-200 px-2 rounded" 
+                                onClick={() => setEditCart(prev => prev.map(p => p.id === item.id ? {...p, qty: p.qty - 1} : p).filter(p => p.qty > 0))}>-</button>
+                            <button className="bg-gray-200 px-2 rounded ml-1" 
+                                onClick={() => setEditCart(prev => prev.map(p => p.id === item.id ? {...p, qty: p.qty + 1} : p))}>+</button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                </div>
+                
+                {/* Alt Bilgi (Sabit) */}
+                <div className="flex gap-2 mt-4 flex-shrink-0">
+                    <button
+                        className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
+                        onClick={handleEditOrderSave}
+                        disabled={editCart.length === 0 || isSaving}
+                    >
+                        {isSaving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
+                    </button>
+                    <button
+                        className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+                        onClick={() => setShowEditModal(false)}
+                    >
+                        İptal
+                    </button>
+                </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Ödeme Modalı */}
+        {showPaymentModal && selectedOrder && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
+                <h3 className="text-xl font-bold mb-4">💰 Ödeme Yöntemi Seç</h3>
+                <p className="mb-4 text-gray-700">
+                  Masa: <strong>{selectedOrder.tableId}</strong>
+                  <br />
+                  Toplam: <strong>{selectedOrder.total} ₺</strong>
+                </p>
+                <div className="flex flex-col gap-3">
+                  <button
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                    onClick={() => {
+                      setPaymentMethod("Kart");
+                      confirmPayment();
+                    }}
+                  >
+                    💳 Kredi/Banka Kartı
+                  </button>
+                  <button
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                    onClick={() => {
+                      setPaymentMethod("Nakit");
+                      confirmPayment();
+                    }}
+                  >
+                    💵 Nakit
+                  </button>
+                </div>
+                <button
+                  className="mt-4 text-gray-500 hover:text-black"
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setSelectedOrder(null);
+                  }}
+                >
+                  İptal
+                </button>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
