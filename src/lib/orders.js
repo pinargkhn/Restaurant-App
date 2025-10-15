@@ -16,9 +16,10 @@ import {
  * @param {string} tableId - Masa ID'si.
  * @param {Array} items - Sipariş ürünleri dizisi.
  * @param {number} total - Toplam fiyat.
+ * @param {string} [note=""] - Müşteri tarafından eklenen sipariş notu.
  * @param {boolean} [isModification=false] - Eğer bu sipariş Garson tarafından yapılan bir düzenleme sonucu oluştuysa true olur.
  */
-export async function submitOrder({ tableId, items, total, isModification = false }) {
+export async function submitOrder({ tableId, items, total, note = "", isModification = false }) { 
   try {
     const ordersRef = collection(db, "tables", tableId, "orders");
 
@@ -39,17 +40,18 @@ export async function submitOrder({ tableId, items, total, isModification = fals
       tableId,
       items: preparedItems,
       total,
-      status: "Yeni",
-      paymentStatus: "Bekleniyor",
+      status: isModification ? "Yeni" : "Yeni", 
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      // ✅ GÜNCELLEME: Eğer düzenleme yapıldıysa VEYA zaten aktif sipariş varsa uyarıyı ver
-      newItemsAdded: isModification || hasActive, 
+      newItemsAdded: hasActive, 
+      paymentStatus: "Bekleniyor", // Eski koddaki Bekleniyor durumunu koruduk
+      note: note, // 🚀 NOTE BURAYA EKLENDİ!
     };
 
     const docRef = await addDoc(ordersRef, orderData);
     console.log(`🆕 Yeni sipariş oluşturuldu (${tableId}):`, docRef.id);
     return docRef.id;
+
   } catch (e) {
     console.error("❌ Sipariş oluşturulamadı:", e);
     throw e;
