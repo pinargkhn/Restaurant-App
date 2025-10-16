@@ -10,25 +10,14 @@ import {
 import MenuPanel from "./MenuPanel";
 import TablePanel from "./TablePanel";
 import UserPanel from "./UserPanel";
+// 🚀 Analiz Hook'u İçe Aktarılıyor
+import useAdminAnalytics from "../hooks/useAdminAnalytics"; 
+// 🚀 Grafik Bileşeni İçe Aktarılıyor (Top 5 Sales için)
+import TopProductsChart from "../components/TopProductsChart"; 
 
 // -------------------------------------------------------------------
-// 🔹 İstatistik hesaplama fonksiyonları (COMPONENT DIŞINDA TANIMLANDI)
-//    Bu, "nextCreate is not a function" hatasını çözmek için önemlidir.
+// 🔹 SADECE sıralama fonksiyonu kaldı.
 // -------------------------------------------------------------------
-
-const calculateCookingTime = (startCookingAt, readyAt) => {
-  if (!startCookingAt?.seconds || !readyAt?.seconds) return null;
-  const diff = readyAt.seconds - startCookingAt.seconds;
-  if (diff <= 0) return null;
-  const minutes = Math.floor(diff / 60);
-  const seconds = diff % 60;
-  return { minutes, seconds, totalSec: diff };
-};
-
-const average = (values) => {
-  if (!values.length) return 0;
-  return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
-};
 
 // 🔹 Siparişleri özel kurala göre sırala (En yeni ödenen/hazırlanan en üstte)
 const compareOrders = (a, b) => {
@@ -50,7 +39,10 @@ export default function Admin() {
   const [view, setView] = useState("dashboard"); // 'dashboard', 'menu', 'tables', 'users'
   const [orders, setOrders] = useState([]);
   
-  // ---------------- Firestore Dinleme ----------------
+  // 🚀 YENİ ANALİZLER HOOK'TAN ÇEKİLİYOR
+  const { stats, paidOrders, completedOrders, topProducts, topPrepTimeMeals, topPrepTimeDesserts } = useAdminAnalytics(orders);
+  
+  // ---------------- Firestore Dinleme (Aynı kalır) ----------------
   useEffect(() => {
     // Aktif siparişleri dinle
     const unsubOrders = onSnapshot(collectionGroup(db, "orders"), (snap) => {
@@ -60,7 +52,7 @@ export default function Admin() {
         ...data.map((d) => ({ ...d, source: "orders" })),
       ]);
     });
-
+    
     // Geçmiş (ödenmiş) siparişleri dinle
     const unsubPast = onSnapshot(collectionGroup(db, "pastOrders"), (snap) => {
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -76,54 +68,13 @@ export default function Admin() {
     };
   }, []);
   
-  // ---------------- useMemo Blokları ----------------
-  
-  // Ödemesi Alınmış Siparişler
-  const paidOrders = useMemo(
-    () =>
-      orders.filter(
-        (o) =>
-          o.paymentStatus === "Alındı" ||
-          (o.source === "pastOrders" && o.paymentStatus === "Alındı")
-      ),
-    [orders]
-  );
-
-  // Hazırlanma Süresi Hesaplanan Siparişler
-  const completedOrders = useMemo(
-    () =>
-      orders
-        .filter((o) => o.startCookingAt?.seconds && o.readyAt?.seconds)
-        .map((o) => ({
-          ...o,
-          cookingTime: calculateCookingTime(o.startCookingAt, o.readyAt),
-        }))
-        .filter((o) => o.cookingTime),
-    [orders]
-  );
-
-  // Genel İstatistikler
-  const stats = useMemo(() => {
-    const durations = completedOrders.map((o) => o.cookingTime.totalSec);
-    return {
-      totalOrders: orders.length,
-      paidCount: paidOrders.length,
-      avgPrepTime: (average(durations) / 60).toFixed(1),
-    };
-  }, [orders, completedOrders, paidOrders]);
-
-
-  // ---------------- VIEW YÖNETİMİ ----------------
-  // Butona basıldığında ilgili paneli gösterir
+  // ---------------- VIEW YÖNETİMİ (Aynı kalır) ----------------
   if (view === "menu") {
-    // MenuPanel'e onBack prop'u ile ana panele dönme fonksiyonu gönderilir
     return <MenuPanel onBack={() => setView("dashboard")} />;
   }
-
   if (view === "tables") {
     return <TablePanel onBack={() => setView("dashboard")} />;
   }
-  
   if (view === "users") {
     return <UserPanel onBack={() => setView("dashboard")} />;
   }
@@ -170,8 +121,83 @@ export default function Admin() {
           <p className="text-2xl font-bold text-yellow-700">{stats.avgPrepTime} dk</p>
         </div>
       </div>
+      
+      {/* 1. SATIR: EN ÇOK SATANLAR GRAFİĞİ */}
+      <div className="border p-4 rounded-lg shadow mb-8 bg-white">
+        <h3 className="text-xl font-semibold mb-4 text-gray-700">
+          🏆 En Çok Satan 5 Ürün (Son 7 Gün)
+        </h3>
+        {topProducts.length > 0 ? (
+          <TopProductsChart data={topProducts} /> 
+        ) : (
+          <p className="text-gray-500">Henüz yeterli ödeme alınmış sipariş yok.</p>
+        )}
+      </div>
 
-      {/* Ödemesi Alınan Siparişler Tablosu */}
+      {/* 🚀 2. SATIR: EN UZUN HAZIRLANMA SÜRELERİ (YAN YANA - TOP 10) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        
+        {/* YEMEK KATEGORİSİ */}
+        <div className="border p-4 rounded-lg shadow bg-white">
+          <h3 className="text-xl font-semibold mb-4 text-gray-700">
+            ⏰ En Uzun Hazırlanan Yemekler (Son 7 Gün - Top 10)
+          </h3>
+          {topPrepTimeMeals.length > 0 ? (
+            <ul className="space-y-3 max-h-96 overflow-y-auto">
+              {topPrepTimeMeals.map((o, index) => (
+                <li key={o.orderId} className="flex justify-between items-center text-sm p-2 border-b last:border-b-0 bg-red-50 rounded">
+                  <div>
+                    {/* 🚀 GÜNCELLENDİ: Sipariş Numarası ve Saati */}
+                    <span className="font-semibold text-gray-800">
+                      #{index + 1} - {new Date(o.orderDateTimestamp * 1000).toLocaleTimeString('tr-TR')}
+                    </span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Ürünler: {o.itemsList}
+                    </p>
+                  </div>
+                  <span className="font-bold text-red-600 text-lg flex-shrink-0 ml-4">
+                    {o.time.minutes} dk {o.time.seconds} sn
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-500">Son 7 günde hazırlanan Yemekler siparişi bulunamadı.</p>
+          )}
+        </div>
+        
+        {/* TATLILAR KATEGORİSİ */}
+        <div className="border p-4 rounded-lg shadow bg-white">
+          <h3 className="text-xl font-semibold mb-4 text-gray-700">
+            🍰 En Uzun Hazırlanan Tatlılar (Son 7 Gün - Top 10)
+          </h3>
+          {topPrepTimeDesserts.length > 0 ? (
+            <ul className="space-y-3 max-h-96 overflow-y-auto">
+              {topPrepTimeDesserts.map((o, index) => (
+                <li key={o.orderId} className="flex justify-between items-center text-sm p-2 border-b last:border-b-0 bg-red-50 rounded">
+                  <div>
+                    {/* 🚀 GÜNCELLENDİ: Sipariş Numarası ve Saati */}
+                    <span className="font-semibold text-gray-800">
+                      #{index + 1} - {new Date(o.orderDateTimestamp * 1000).toLocaleTimeString('tr-TR')}
+                    </span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Ürünler: {o.itemsList}
+                    </p>
+                  </div>
+                  <span className="font-bold text-red-600 text-lg flex-shrink-0 ml-4">
+                    {o.time.minutes} dk {o.time.seconds} sn
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-500">Son 7 günde hazırlanan Tatlılar siparişi bulunamadı.</p>
+          )}
+        </div>
+        
+      </div>
+
+      {/* Ödemesi Alınan Siparişler Tablosu (Aynı kalır) */}
       <h3 className="text-xl font-semibold mb-3 text-gray-700">
         💰 Ödemesi Alınan Siparişler
       </h3>
@@ -188,10 +214,19 @@ export default function Admin() {
         </thead>
         <tbody>
           {[...paidOrders].sort(compareOrders).map((o) => {
-            const cookingTime = calculateCookingTime(o.startCookingAt, o.readyAt);
+            // CookingTime'ı hook'tan gelen completedOrders'ı kullanarak bul
+            const completed = completedOrders.find(co => co.id === o.id);
+            const cookingTime = completed?.cookingTime;
+            
             const productList = o.items
               ? o.items.map((it) => `${it.name} ×${it.qty || 1}`).join(", ")
               : "-";
+              
+            // Ödeme tarihi düzeltmesi
+            const paymentTimestamp = o.paymentAt?.seconds 
+                                     ? o.paymentAt.seconds 
+                                     : o.movedAt?.seconds;
+                                       
             return (
               <tr key={`${o.id}-${o.tableId}`} className="hover:bg-gray-50">
                 <td className="border p-2">{o.tableId || "-"}</td>
@@ -205,8 +240,8 @@ export default function Admin() {
                     : "-"}
                 </td>
                 <td className="border p-2">
-                  {o.paymentAt?.seconds
-                    ? new Date(o.paymentAt.seconds * 1000).toLocaleString("tr-TR")
+                  {paymentTimestamp
+                    ? new Date(paymentTimestamp * 1000).toLocaleString("tr-TR")
                     : "-"}
                 </td>
                 <td className="border p-2 font-semibold text-right">
