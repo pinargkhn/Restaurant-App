@@ -89,13 +89,26 @@ export default function MenuPanel({ onBack }) {
       // 2. YENİ DOSYA YÜKLE
       if (file) {
         // Yükleme referansını oluştur (products/urun_adi_timestamp)
-        const storageRef = ref(storage, `products/${newProduct.name}_${Date.now()}_${file.name}`);
-        
-        // Yükleme görevini başlat
-        const uploadTask = uploadBytes(storageRef, file);
-        
-        const snapshot = await uploadTask;
-        finalImageUrl = await getDownloadURL(snapshot.ref);
+        // 🔹 1. Dosya yolunu oluştur
+        const filePath = `products/${newProduct.name}_${Date.now()}_${file.name}`;
+
+        // 🔹 2. Yükleme URL’sini hazırla (Google Cloud Storage API)
+        const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/restaurant-app-c4414/o?uploadType=media&name=${encodeURIComponent(filePath)}`;
+
+        // 🔹 3. Yükleme isteğini gönder (fetch ile)
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": file.type,
+            // Eğer bucket private olsaydı, buraya Authorization eklenirdi
+          },
+          body: file,
+        });
+
+        // 🔹 4. Başarılıysa public URL’yi oluştur
+        if (!response.ok) throw new Error("Yükleme başarısız oldu.");
+
+        finalImageUrl = `https://storage.googleapis.com/restaurant-app-c4414/${filePath}`;
         
         // Yükleme tamamlandıysa eski görseli sil
         if (editingId && oldImageUrl) {

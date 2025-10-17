@@ -37,7 +37,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app); 
 // 🚀 YENİ: Storage'ı başlat
-const storage = getStorage(app); 
+const storage = getStorage(app, "gs://restaurant-app-c4414");
 
 export {
   db,
