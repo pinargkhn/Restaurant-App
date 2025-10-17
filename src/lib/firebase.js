@@ -1,22 +1,26 @@
-// ✅ Firebase yapılandırması (Auth + Firestore dahil)
+// src/lib/firebase.js
 
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
-  serverTimestamp,
-  addDoc,
-  collectionGroup,
   collection,
+  collectionGroup,
+  addDoc,
   updateDoc,
   deleteDoc,
   doc,
   setDoc,
+  getDoc,
+  getDocs,
   onSnapshot,
+  serverTimestamp,
   query,
   orderBy,
   where,
 } from "firebase/firestore";
-import { getAuth } from "firebase/auth"; // 🔹 Authentication eklendi
+import { getAuth } from "firebase/auth";
+// 🚀 YENİ İMPORTLAR: Firebase Storage
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"; 
 
 // 🔐 .env dosyandaki Firebase bilgilerini kullan
 const firebaseConfig = {
@@ -28,23 +32,34 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_APP_ID,
 };
 
-// 🔹 Firebase başlat
+// 🔹 Firebase başlatma
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-export const auth = getAuth(app); // 🔹 Auth sistemini dışa aktar
+const db = getFirestore(app);
+const auth = getAuth(app); 
+// 🚀 YENİ: Storage'ı başlat
+const storage = getStorage(app); 
 
-// 🔹 Firestore fonksiyonlarını export et
 export {
-  serverTimestamp,
-  addDoc,
+  db,
+  auth, 
   collection,
   collectionGroup,
+  addDoc,
   updateDoc,
   deleteDoc,
   doc,
   setDoc,
+  getDoc,
+  getDocs,
   onSnapshot,
+  serverTimestamp,
   query,
   orderBy,
   where,
+  // 🚀 YENİ EXPORTLAR: Storage
+  storage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
 };

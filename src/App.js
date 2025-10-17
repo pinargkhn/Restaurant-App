@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import Menu from "./components/Menu";
+import Menu from "./pages/Menu";
 import Kitchen from "./pages/Kitchen";
 import Waiter from "./pages/Waiter";
 import Login from "./pages/Login";

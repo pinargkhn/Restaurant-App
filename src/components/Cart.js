@@ -1,75 +1,91 @@
+import React from "react";
 import { useCart } from "../context/CartContext";
-import { submitOrder } from "../lib/orders";
 
 export default function Cart() {
-  const { items, total, increaseQty, decreaseQty, removeItem, clearCart } = useCart();
-  const tableId = new URLSearchParams(window.location.search).get("table") || "unknown";
+  const { cart, tableId, updateItemQty, clearCart, placeOrder, updateNote } = useCart(); // 🔹 updateNote eklendi
+  const { items, total, note } = cart; // 🔹 note eklendi
 
-  const handleConfirm = async () => {
-    if (!items.length) return alert("Sepet boş!");
-    try {
-      console.log("Sipariş gönderiliyor:", { tableId, items, total });
-
-      const orderId = await submitOrder({ tableId, items, total });
-      console.log("Sipariş eklendi ID:", orderId);
-
-      await clearCart(); // ✅ sepet temizlenir
-      alert("Sipariş alındı!");
-    } catch (e) {
-      console.error("Sipariş gönderilemedi:", e);
-      alert("Sipariş gönderilemedi.");
-    }
-  };
+  // Sepet boşsa gösterilecek minimal görünüm
+  if (items.length === 0) {
+    return (
+      <div className="md:w-96 p-6 md:h-screen sticky top-0 bg-gray-50 border-l border-t md:border-t-0 shadow-lg flex flex-col justify-center items-center">
+        <p className="text-xl font-semibold text-gray-500">
+          Sepetiniz boş.
+        </p>
+        {tableId && (
+          <p className="text-sm text-gray-400 mt-2">
+            Masa: {tableId}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <aside className="w-80 bg-white shadow-lg p-4 sticky top-0 h-screen overflow-y-auto">
-      <h3 className="text-xl font-semibold mb-3">Sepet</h3>
+    <div className="md:w-96 p-6 md:h-screen sticky top-0 bg-gray-50 border-l border-t md:border-t-0 shadow-lg flex flex-col">
+      <h3 className="text-xl font-bold mb-4">🛒 Sipariş Sepetiniz</h3>
 
-      {!items.length && <p className="text-gray-500">Sepet boş.</p>}
-
-      {!!items.length && (
-        <>
-          <ul className="divide-y">
-            {items.map((p) => (
-              <li key={p.id} className="py-2 flex justify-between items-center">
-                <span className="font-medium">{p.name}</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="px-2 py-1 bg-gray-200 rounded"
-                    onClick={() => decreaseQty(p.id)}
-                  >
-                    −
-                  </button>
-                  <span>{p.qty}</span>
-                  <button
-                    className="px-2 py-1 bg-gray-200 rounded"
-                    onClick={() => increaseQty(p.id)}
-                  >
-                    +
-                  </button>
-                  <span className="font-semibold">{p.price * p.qty} ₺</span>
-                  <button
-                    className="text-red-600 ml-2"
-                    onClick={() => removeItem(p.id)}
-                  >
-                    Sil
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <div className="flex justify-between items-center mt-4">
-            <span className="text-lg font-bold">Toplam: {total} ₺</span>
-            <button
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              onClick={handleConfirm}
-            >
-              Sepeti Onayla
-            </button>
+      {/* Sepet İçeriği */}
+      <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+        {items.map((item) => (
+          <div key={item.id} className="flex justify-between items-center border-b pb-2">
+            <span className="font-medium">{item.name}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">
+                {item.price} ₺
+              </span>
+              <button
+                onClick={() => updateItemQty(item.id, -1)}
+                className="bg-gray-200 text-black px-2 rounded hover:bg-gray-300"
+              >
+                −
+              </button>
+              <span className="font-semibold">{item.qty}</span>
+              <button
+                onClick={() => updateItemQty(item.id, 1)}
+                className="bg-gray-200 text-black px-2 rounded hover:bg-gray-300"
+              >
+                +
+              </button>
+            </div>
           </div>
-        </>
-      )}
-    </aside>
+        ))}
+      </div>
+      
+      {/* 🔹 YENİ ALAN: Sipariş Notu */}
+      <div className="mt-4 pt-4 border-t">
+          <label htmlFor="order-note" className="block text-sm font-semibold mb-2">
+              Sipariş Notu (Opsiyonel)
+          </label>
+          <textarea
+              id="order-note"
+              value={note}
+              onChange={(e) => updateNote(e.target.value)} // 🔹 updateNote fonksiyonu ile bağlanır
+              rows="3"
+              placeholder="Ekstra sos, alerjen bilgisi vb."
+              className="w-full border p-2 rounded focus:ring-blue-500 focus:border-blue-500 resize-none"
+          />
+      </div>
+
+      {/* Alt Bilgi ve Butonlar */}
+      <div className="mt-4 pt-4 border-t">
+        <div className="flex justify-between font-bold text-lg mb-4">
+          <span>Toplam:</span>
+          <span>{total.toFixed(2)} ₺</span>
+        </div>
+        <button
+          onClick={placeOrder}
+          className="w-full bg-blue-600 text-white py-3 rounded font-semibold hover:bg-blue-700 transition mb-2"
+        >
+          Siparişi Onayla ve Gönder
+        </button>
+        <button
+          onClick={clearCart}
+          className="w-full bg-red-500 text-white py-1 rounded hover:bg-red-600 transition text-sm"
+        >
+          Sepeti Temizle
+        </button>
+      </div>
+    </div>
   );
 }

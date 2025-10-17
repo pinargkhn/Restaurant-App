@@ -1,41 +1,50 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+// src/pages/Admin.js
+import React, { useEffect, useState, useMemo } from "react";
 import {
   db,
-  collection,
   collectionGroup,
   onSnapshot,
-  doc,
-  setDoc,
-  deleteDoc,
-} from "../lib/firebase";
-import { QRCodeCanvas } from "qrcode.react";
+} from "../lib/firebase"; // Lütfen `../lib/firebase` dosyasının doğru olduğundan emin olun.
 
-// 🔹 Süre hesaplama fonksiyonu
-const calculateDuration = (createdAt, readyAt) => {
-  if (!createdAt?.seconds || !readyAt?.seconds) return null;
-  const diff = readyAt.seconds - createdAt.seconds;
-  if (diff < 0) return null;
-  const minutes = Math.floor(diff / 60);
-  const seconds = diff % 60;
-  return { minutes, seconds, totalSec: diff };
+// 🔹 Alt Panelleri İçe Aktar
+import MenuPanel from "./MenuPanel";
+import TablePanel from "./TablePanel";
+import UserPanel from "./UserPanel";
+// 🚀 Analiz Hook'u İçe Aktarılıyor
+import useAdminAnalytics from "../hooks/useAdminAnalytics"; 
+// 🚀 Grafik Bileşeni İçe Aktarılıyor (Top 5 Sales için)
+import TopProductsChart from "../components/TopProductsChart"; 
+
+// -------------------------------------------------------------------
+// 🔹 SADECE sıralama fonksiyonu kaldı.
+// -------------------------------------------------------------------
+
+// 🔹 Siparişleri özel kurala göre sırala (En yeni ödenen/hazırlanan en üstte)
+const compareOrders = (a, b) => {
+  if (a.newItemsAdded && !b.newItemsAdded) return -1;
+  if (!a.newItemsAdded && b.newItemsAdded) return 1;
+
+  if (a.status === "Hazır" && b.status === "Hazır") {
+    return (b.readyAt?.seconds || 0) - (a.readyAt?.seconds || 0);
+  }
+
+  const aTime = a.updatedAt?.seconds || a.paymentAt?.seconds || 0;
+  const bTime = b.updatedAt?.seconds || b.paymentAt?.seconds || 0;
+  return bTime - aTime;
 };
 
-const average = (values) => {
-  if (!values.length) return 0;
-  return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
-};
+// -------------------------------------------------------------------
 
-export default function AdminDashboard() {
-  const [view, setView] = useState("dashboard"); // "dashboard" | "tables"
+export default function Admin() {
+  const [view, setView] = useState("dashboard"); // 'dashboard', 'menu', 'tables', 'users'
   const [orders, setOrders] = useState([]);
-  const [tables, setTables] = useState([]);
-  const [newTableId, setNewTableId] = useState("");
-  const navigate = useNavigate();
-  const baseUrl = window.location.origin;
-
-  // 🔹 Siparişleri (aktif + geçmiş) dinle
+  
+  // 🚀 YENİ ANALİZLER HOOK'TAN ÇEKİLİYOR
+  const { stats, paidOrders, completedOrders, topProducts, topPrepTimeMeals, topPrepTimeDesserts } = useAdminAnalytics(orders);
+  
+  // ---------------- Firestore Dinleme (Aynı kalır) ----------------
   useEffect(() => {
+    // Aktif siparişleri dinle
     const unsubOrders = onSnapshot(collectionGroup(db, "orders"), (snap) => {
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setOrders((prev) => [
@@ -43,7 +52,8 @@ export default function AdminDashboard() {
         ...data.map((d) => ({ ...d, source: "orders" })),
       ]);
     });
-
+    
+    // Geçmiş (ödenmiş) siparişleri dinle
     const unsubPast = onSnapshot(collectionGroup(db, "pastOrders"), (snap) => {
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setOrders((prev) => [
@@ -57,230 +67,191 @@ export default function AdminDashboard() {
       unsubPast();
     };
   }, []);
-
-  // 🔹 Masaları dinle
-  useEffect(() => {
-    const unsubTables = onSnapshot(collection(db, "tables"), (snap) => {
-      setTables(
-        snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
-      );
-    });
-    return () => unsubTables();
-  }, []);
-
-  // 🔹 Masa oluştur
-  const handleAddTable = async () => {
-    if (!newTableId.trim()) return;
-    const ref = doc(db, "tables", newTableId);
-    await setDoc(
-      ref,
-      { createdAt: new Date(), cart: { items: [], total: 0 } },
-      { merge: true }
-    );
-    setNewTableId("");
-  };
-
-  // 🔹 Masa sil
-  const handleDeleteTable = async (id) => {
-    if (window.confirm(`${id} adlı masayı silmek istiyor musun?`)) {
-      await deleteDoc(doc(db, "tables", id));
-    }
-  };
-
-  // 🔹 İstatistik hesaplama
-  const completedOrders = useMemo(
-    () =>
-      orders
-        .filter((o) => o.status === "Hazır" && o.readyAt?.seconds)
-        .map((o) => ({
-          ...o,
-          duration: calculateDuration(o.createdAt, o.readyAt),
-        }))
-        .filter((o) => o.duration),
-    [orders]
-  );
-
-  const stats = useMemo(() => {
-    const durations = completedOrders.map((o) => o.duration.totalSec);
-    return {
-      totalOrders: orders.length,
-      completed: completedOrders.length,
-      avgPrepTime: average(durations) / 60,
-    };
-  }, [orders, completedOrders]);
-
-  // ============================================================
-  // ============ GÖRÜNÜM 1: YÖNETİCİ DASHBOARD ================
-  // ============================================================
-
-  if (view === "dashboard") {
-    return (
-      <div className="p-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold mb-6 text-center">🧑‍💼 Yönetici Paneli</h2>
-
-        {/* Görünüm değiştirme */}
-        <div className="flex justify-end mb-6">
-          <button
-            onClick={() => setView("tables")}
-            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
-          >
-            Masa & QR Yönetimine Geç
-          </button>
-        </div>
-
-        {/* İstatistik Kartları */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-blue-100 p-4 rounded shadow text-center">
-            <h3 className="text-lg font-semibold">Toplam Sipariş</h3>
-            <p className="text-2xl font-bold text-blue-700">{stats.totalOrders}</p>
-          </div>
-          <div className="bg-green-100 p-4 rounded shadow text-center">
-            <h3 className="text-lg font-semibold">Hazır Sipariş</h3>
-            <p className="text-2xl font-bold text-green-700">{stats.completed}</p>
-          </div>
-          <div className="bg-yellow-100 p-4 rounded shadow text-center">
-            <h3 className="text-lg font-semibold">Ortalama Süre</h3>
-            <p className="text-2xl font-bold text-yellow-700">
-              {stats.avgPrepTime.toFixed(1)} dk
-            </p>
-          </div>
-        </div>
-
-        {/* 🔹 Sipariş Tablosu */}
-        <table className="w-full border-collapse border border-gray-300 text-sm shadow mb-8">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border p-2 text-left">Masa</th>
-              <th className="border p-2 text-left">Durum</th>
-              <th className="border p-2 text-left">Ürünler</th>
-              <th className="border p-2 text-left">Hazırlanma Süresi</th>
-              <th className="border p-2 text-left">Oluşturulma</th>
-              <th className="border p-2 text-left">Toplam Fiyat (₺)</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {[...orders]
-              .sort((a, b) => {
-                const aTime = a.createdAt?.seconds || 0;
-                const bTime = b.createdAt?.seconds || 0;
-                return bTime - aTime;
-              })
-              .map((o) => {
-                const duration =
-                  o.readyAt && o.createdAt
-                    ? o.readyAt.seconds - o.createdAt.seconds
-                    : null;
-
-                const productList = o.items
-                  ? o.items.map((it) => `${it.name} ×${it.qty || 1}`).join(", ")
-                  : "-";
-
-                return (
-                  <tr key={`${o.id}-${o.tableId}`} className="hover:bg-gray-50">
-                    <td className="border p-2">{o.tableId || "-"}</td>
-                    <td
-                      className={`border p-2 font-medium ${
-                        o.status === "Hazır"
-                          ? "text-green-700"
-                          : o.status === "Hazırlanıyor"
-                          ? "text-yellow-700"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {o.status}
-                    </td>
-                    <td className="border p-2 text-sm text-gray-800">
-                      {productList}
-                    </td>
-                    <td className="border p-2">
-                      {duration
-                        ? `${Math.floor(duration / 60)} dk ${duration % 60} sn`
-                        : "-"}
-                    </td>
-                    <td className="border p-2">
-                      {o.createdAt?.seconds
-                        ? new Date(o.createdAt.seconds * 1000).toLocaleString("tr-TR")
-                        : "-"}
-                    </td>
-                    <td className="border p-2 font-semibold text-right">
-                      {o.total ? `${o.total} ₺` : "-"}
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
-      </div>
-    );
+  
+  // ---------------- VIEW YÖNETİMİ (Aynı kalır) ----------------
+  if (view === "menu") {
+    return <MenuPanel onBack={() => setView("dashboard")} />;
+  }
+  if (view === "tables") {
+    return <TablePanel onBack={() => setView("dashboard")} />;
+  }
+  if (view === "users") {
+    return <UserPanel onBack={() => setView("dashboard")} />;
   }
 
-  // ============================================================
-  // ============ GÖRÜNÜM 2: MASA & QR YÖNETİMİ ================
-  // ============================================================
-
+  // ---------------- Ana Dashboard (view === "dashboard") ----------------
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <h2 className="text-3xl font-bold mb-6 text-center">🪑 Masa ve QR Kod Yönetimi</h2>
+      <h2 className="text-3xl font-bold mb-6 text-center">🧑‍💼 Yönetim Paneli (Ana)</h2>
 
-      {/* Geri dön */}
-      <div className="flex justify-end mb-6">
+      {/* Navigasyon Butonları */}
+      <div className="flex justify-center gap-4 mb-8 p-4 border rounded-lg shadow">
         <button
-          onClick={() => setView("dashboard")}
-          className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
+          onClick={() => setView("menu")} 
+          className="bg-pink-600 text-white px-4 py-2 rounded hover:bg-pink-700 transition"
         >
-          ← Yönetici Paneline Dön
+          🍔 Menü Yönetimi
+        </button>
+        <button
+          onClick={() => setView("tables")} 
+          className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+        >
+          🪑 Masa & QR Yönetimi
+        </button>
+        <button
+          onClick={() => setView("users")} 
+          className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition"
+        >
+          👤 Kullanıcı Yönetimi
         </button>
       </div>
 
-      {/* Masa ekleme alanı */}
-      <div className="flex gap-2 mb-6">
-        <input
-          type="text"
-          value={newTableId}
-          onChange={(e) => setNewTableId(e.target.value)}
-          placeholder="masa_5"
-          className="border p-2 rounded flex-1"
-        />
-        <button
-          onClick={handleAddTable}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-        >
-          Masa Ekle
-        </button>
+      {/* İstatistik Kartları */}
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="bg-blue-100 p-4 rounded shadow text-center">
+          <h3 className="text-lg font-semibold">Toplam Sipariş</h3>
+          <p className="text-2xl font-bold text-blue-700">{stats.totalOrders}</p>
+        </div>
+        <div className="bg-green-100 p-4 rounded shadow text-center">
+          <h3 className="text-lg font-semibold">Ödemesi Alınanlar</h3>
+          <p className="text-2xl font-bold text-green-700">{stats.paidCount}</p>
+        </div>
+        <div className="bg-yellow-100 p-4 rounded shadow text-center">
+          <h3 className="text-lg font-semibold">Ortalama Hazırlık Süresi</h3>
+          <p className="text-2xl font-bold text-yellow-700">{stats.avgPrepTime} dk</p>
+        </div>
+      </div>
+      
+      {/* 1. SATIR: EN ÇOK SATANLAR GRAFİĞİ */}
+      <div className="border p-4 rounded-lg shadow mb-8 bg-white">
+        <h3 className="text-xl font-semibold mb-4 text-gray-700">
+          🏆 En Çok Satan 5 Ürün (Son 7 Gün)
+        </h3>
+        {topProducts.length > 0 ? (
+          <TopProductsChart data={topProducts} /> 
+        ) : (
+          <p className="text-gray-500">Henüz yeterli ödeme alınmış sipariş yok.</p>
+        )}
       </div>
 
-      {/* Masa + QR Kod listesi */}
-      <div className="grid md:grid-cols-3 sm:grid-cols-2 gap-6">
-        {tables.map((t) => {
-          const qrUrl = `${baseUrl}/?table=${t.id}`;
-          return (
-            <div
-              key={t.id}
-              className="border rounded-lg shadow p-4 bg-white flex flex-col items-center justify-between"
-            >
-              <h3 className="font-semibold text-lg mb-2">Masa: {t.id}</h3>
-              <QRCodeCanvas value={qrUrl} size={140} />
-              <p className="text-sm text-gray-600 mt-2 break-all">{qrUrl}</p>
-
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={() => handleDeleteTable(t.id)}
-                  className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
-                >
-                  Sil
-                </button>
-              </div>
-            </div>
-          );
-        })}
+      {/* 🚀 2. SATIR: EN UZUN HAZIRLANMA SÜRELERİ (YAN YANA - TOP 10) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        
+        {/* YEMEK KATEGORİSİ */}
+        <div className="border p-4 rounded-lg shadow bg-white">
+          <h3 className="text-xl font-semibold mb-4 text-gray-700">
+            ⏰ En Uzun Hazırlanan Yemekler (Son 7 Gün - Top 10)
+          </h3>
+          {topPrepTimeMeals.length > 0 ? (
+            <ul className="space-y-3 max-h-96 overflow-y-auto">
+              {topPrepTimeMeals.map((o, index) => (
+                <li key={o.orderId} className="flex justify-between items-center text-sm p-2 border-b last:border-b-0 bg-red-50 rounded">
+                  <div>
+                    {/* 🚀 GÜNCELLENDİ: Sipariş Numarası ve Saati */}
+                    <span className="font-semibold text-gray-800">
+                      #{index + 1} - {new Date(o.orderDateTimestamp * 1000).toLocaleTimeString('tr-TR')}
+                    </span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Ürünler: {o.itemsList}
+                    </p>
+                  </div>
+                  <span className="font-bold text-red-600 text-lg flex-shrink-0 ml-4">
+                    {o.time.minutes} dk {o.time.seconds} sn
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-500">Son 7 günde hazırlanan Yemekler siparişi bulunamadı.</p>
+          )}
+        </div>
+        
+        {/* TATLILAR KATEGORİSİ */}
+        <div className="border p-4 rounded-lg shadow bg-white">
+          <h3 className="text-xl font-semibold mb-4 text-gray-700">
+            🍰 En Uzun Hazırlanan Tatlılar (Son 7 Gün - Top 10)
+          </h3>
+          {topPrepTimeDesserts.length > 0 ? (
+            <ul className="space-y-3 max-h-96 overflow-y-auto">
+              {topPrepTimeDesserts.map((o, index) => (
+                <li key={o.orderId} className="flex justify-between items-center text-sm p-2 border-b last:border-b-0 bg-red-50 rounded">
+                  <div>
+                    {/* 🚀 GÜNCELLENDİ: Sipariş Numarası ve Saati */}
+                    <span className="font-semibold text-gray-800">
+                      #{index + 1} - {new Date(o.orderDateTimestamp * 1000).toLocaleTimeString('tr-TR')}
+                    </span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Ürünler: {o.itemsList}
+                    </p>
+                  </div>
+                  <span className="font-bold text-red-600 text-lg flex-shrink-0 ml-4">
+                    {o.time.minutes} dk {o.time.seconds} sn
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-500">Son 7 günde hazırlanan Tatlılar siparişi bulunamadı.</p>
+          )}
+        </div>
+        
       </div>
 
-      {!tables.length && (
-        <p className="text-gray-500 text-center mt-10">Henüz masa eklenmemiş.</p>
-      )}
+      {/* Ödemesi Alınan Siparişler Tablosu (Aynı kalır) */}
+      <h3 className="text-xl font-semibold mb-3 text-gray-700">
+        💰 Ödemesi Alınan Siparişler
+      </h3>
+      <table className="w-full border-collapse border border-gray-300 text-sm shadow mb-8">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="border p-2 text-left">Masa</th>
+            <th className="border p-2 text-left">Ödeme Türü</th>
+            <th className="border p-2 text-left">Ürünler</th>
+            <th className="border p-2 text-left">Hazırlık Süresi</th>
+            <th className="border p-2 text-left">Ödeme Tarihi</th>
+            <th className="border p-2 text-left">Toplam (₺)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[...paidOrders].sort(compareOrders).map((o) => {
+            // CookingTime'ı hook'tan gelen completedOrders'ı kullanarak bul
+            const completed = completedOrders.find(co => co.id === o.id);
+            const cookingTime = completed?.cookingTime;
+            
+            const productList = o.items
+              ? o.items.map((it) => `${it.name} ×${it.qty || 1}`).join(", ")
+              : "-";
+              
+            // Ödeme tarihi düzeltmesi
+            const paymentTimestamp = o.paymentAt?.seconds 
+                                     ? o.paymentAt.seconds 
+                                     : o.movedAt?.seconds;
+                                       
+            return (
+              <tr key={`${o.id}-${o.tableId}`} className="hover:bg-gray-50">
+                <td className="border p-2">{o.tableId || "-"}</td>
+                <td className="border p-2 font-medium text-green-700">
+                  {o.paymentMethod || "-"}
+                </td>
+                <td className="border p-2 text-sm text-gray-800">{productList}</td>
+                <td className="border p-2 text-center">
+                  {cookingTime
+                    ? `${cookingTime.minutes} dk ${cookingTime.seconds} sn`
+                    : "-"}
+                </td>
+                <td className="border p-2">
+                  {paymentTimestamp
+                    ? new Date(paymentTimestamp * 1000).toLocaleString("tr-TR")
+                    : "-"}
+                </td>
+                <td className="border p-2 font-semibold text-right">
+                  {o.total ? `${o.total} ₺` : "-"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

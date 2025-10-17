@@ -1,89 +1,160 @@
+// src/pages/Kitchen.js
 import { useEffect, useState } from "react";
-import { db, collection, onSnapshot, doc, updateDoc } from "../lib/firebase";
-import { updateOrderStatus } from "../lib/orders";
+import { db, collection, onSnapshot, doc, updateDoc, serverTimestamp } from "../lib/firebase";
 
 export default function Kitchen() {
   const [orders, setOrders] = useState([]);
 
+  // ---------------- HELPER FONKSİYONLAR ----------------
+  const mergeItems = (orders) => {
+    const combinedItems = {};
+    orders.forEach(order => {
+      (order.items || []).forEach(item => {
+        const key = item.id;
+        if (combinedItems[key]) combinedItems[key].qty += item.qty;
+        else combinedItems[key] = { ...item };
+      });
+    });
+    return Object.values(combinedItems);
+  };
+
+  const getMergedStatus = (orders) => {
+    if (orders.some(o => o.status === "Hazır")) return "Hazır";
+    if (orders.some(o => o.status === "Hazırlanıyor")) return "Hazırlanıyor";
+    return "Yeni";
+  };
+
+  const getMergedNewItemsAdded = (orders) =>
+    orders.some(o => o.newItemsAdded === true);
+
+  const getLatestReadyAt = (orders) => {
+    const ready = orders.filter(o => o.status === "Hazır");
+    if (!ready.length) return null;
+    return ready.sort((a,b)=>(b.readyAt?.seconds||0)-(a.readyAt?.seconds||0))[0].readyAt;
+  };
+  
+  // 🔹 YENİ HELPER: En son güncellenen sipariş belgesini bulur.
+  const getLatestOrder = (orders) => {
+    return orders.sort(
+        (a, b) => (b.updatedAt?.seconds || b.createdAt?.seconds || 0) - (a.updatedAt?.seconds || a.createdAt?.seconds || 0)
+    )[0];
+  };
+
+  // 🔹 Masaya göre siparişleri birleştirir
+  const mergeActiveOrdersByTable = (allOrders) => {
+    const nonDelivered = allOrders.filter(o => o.status !== "Teslim Edildi");
+    const grouped = nonDelivered.reduce((acc, o) => {
+      (acc[o.tableId] ||= []).push(o);
+      return acc;
+    }, {});
+    
+    return Object.entries(grouped).map(([tableId, list]) => {
+      const latest = getLatestOrder(list); // 🔹 EN SON SİPARİŞİ BUL
+      
+      return {
+        tableId,
+        id: list.map((x) => x.id),
+        orderDocuments: list,
+        items: mergeItems(list),
+        status: getMergedStatus(list),
+        newItemsAdded: getMergedNewItemsAdded(list),
+        latestReadyAt: getLatestReadyAt(list),
+        note: latest.note || "", // 🚀 NOTE'u EN SON SİPARİŞTEN AL
+      };
+    });
+  };
+
+  const getBgColor = (order) => {
+    if (order.newItemsAdded) return "bg-red-100";     // ⚠️ yeni ürün → kırmızı
+    switch (order.status) {
+      case "Hazırlanıyor": return "bg-yellow-100";
+      case "Hazır":        return "bg-green-200";
+      default:             return "bg-white";
+    }
+  };
+
+  const compareOrders = (a, b) => {
+    if (a.newItemsAdded && !b.newItemsAdded) return -1;
+    if (!a.newItemsAdded && b.newItemsAdded) return 1;
+    if (a.status === "Hazır" && b.status === "Hazır")
+      return (b.readyAt?.seconds||0)-(a.readyAt?.seconds||0);
+    const at = a.updatedAt?.seconds||a.createdAt?.seconds||0;
+    const bt = b.updatedAt?.seconds||b.createdAt?.seconds||0;
+    return bt - at;
+  };
+
+  // ---------------- FIRESTORE DİNLEME (Aynı kalır) ----------------
   useEffect(() => {
     const tablesRef = collection(db, "tables");
-    const unsubscribeTables = onSnapshot(tablesRef, (tablesSnap) => {
+    const unsubTables = onSnapshot(tablesRef, (tablesSnap) => {
       const unsubscribers = [];
-
-      // Her tabloyu dinle
-      tablesSnap.forEach((tableDoc) => {
-        const tableId = tableDoc.id;
-        const ordersRef = collection(db, "tables", tableId, "orders");
-
-        const unsub = onSnapshot(ordersRef, (ordersSnap) => {
-          setOrders((prevOrders) => {
-            // Önce bu masaya ait eski siparişleri temizle
-            const filtered = prevOrders.filter((o) => o.tableId !== tableId);
-
-            // Yeni snapshot'tan gelen siparişleri ekle
-            const newOrders = ordersSnap.docs.map((d) => ({
-              id: d.id,
-              tableId,
-              ...d.data(),
-            }));
-
-            return [...filtered, ...newOrders];
-          });
+      let all = [];
+      tablesSnap.forEach((t) => {
+        const ordersRef = collection(db, "tables", t.id, "orders");
+        const unsub = onSnapshot(ordersRef, (snap) => {
+          all = all.filter(o => o.tableId !== t.id).concat(
+            snap.docs.map(d => ({ id: d.id, tableId: t.id, ...d.data() }))
+          );
+          setOrders(mergeActiveOrdersByTable(all));
         });
-
         unsubscribers.push(unsub);
       });
-
-      // cleanup
-      return () => unsubscribers.forEach((u) => u());
+      return () => unsubscribers.forEach(u=>u());
     });
-
-    return () => unsubscribeTables();
+    return () => unsubTables();
   }, []);
 
-  const getBgColor = (status) => {
-    switch (status) {
-      case "Hazırlanıyor":
-        return "bg-yellow-100";
-      case "Hazır":
-        return "bg-green-200";
-      default:
-        return "bg-white";
-    }
-  };
-
-  const handleStatusChange = async (tableId, orderId, status) => {
+  // ---------------- Durum Güncelleme (Aynı kalır) ----------------
+  const handleStatusChange = async (mergedOrder, newStatus) => {
+    if (!mergedOrder.tableId) return;
     try {
-      await updateOrderStatus(tableId, orderId, status);
-      await updateDoc(doc(db, "tables", tableId, "orders", orderId), {
-        newItemsAdded: false,
-      });
+      if (newStatus === "Hazır") {
+        // ✅ tüm alt siparişleri Hazır yap ve uyarıyı kaldır
+        for (const sub of mergedOrder.orderDocuments) {
+          const ref = doc(db, "tables", mergedOrder.tableId, "orders", sub.id);
+          await updateDoc(ref, {
+            status: "Hazır",
+            readyAt: new Date(),
+            newItemsAdded: false,  // ✅ sadece burada sıfırla
+          });
+        }
+      } else if (newStatus === "Hazırlanıyor") {
+        // 🔹 sadece en yeni belgeyi güncelle; uyarıyı KALDIRMA
+        const target = mergedOrder.orderDocuments.sort(
+          (a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)
+        )[0];
+        const ref = doc(db, "tables", mergedOrder.tableId, "orders", target.id);
+        await updateDoc(ref, {
+          status: "Hazırlanıyor",
+          startCookingAt: new Date(),
+          // newItemsAdded: (dokunma) → uyarı devam eder
+        });
+      }
+      alert(`✅ ${mergedOrder.tableId} masası '${newStatus}' olarak güncellendi.`);
     } catch (err) {
-      console.error("Durum güncelleme hatası:", err);
+      console.error("❌ Firestore güncelleme hatası:", err);
+      alert("Güncelleme hatası oluştu. Console'u kontrol et.");
     }
   };
 
+  // ---------------- RENDER ----------------
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold mb-4">🍳 Mutfak Paneli</h2>
-
       {!orders.length && <p className="text-gray-500">Henüz sipariş yok.</p>}
 
       <ul className="space-y-4">
         {orders
-          .filter((o) => o.status !== "Teslim Edildi")
-          .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-          .map((o) => (
-            <li
-              key={`${o.tableId}-${o.id}`}
-              className={`rounded shadow p-4 ${getBgColor(o.status)}`}
-            >
+          .filter(o => o.status !== "Teslim Edildi")
+          .sort(compareOrders)
+          .map(o => (
+            <li key={o.tableId} className={`rounded shadow p-4 ${getBgColor(o)}`}>
               <div className="flex justify-between items-center">
                 <span className="font-semibold">
                   Masa: {o.tableId}
                   {o.newItemsAdded && (
                     <span className="ml-2 text-red-600 font-semibold animate-pulse">
-                      ⚠️ Yeni ürün eklendi
+                      ⚠️ Yeni ürün eklendi – Garson bilgilendirildi
                     </span>
                   )}
                 </span>
@@ -91,29 +162,32 @@ export default function Kitchen() {
                   {o.status}
                 </span>
               </div>
+              
+              {/* 🚀 YENİ ALAN: SİPARİŞ NOTU */}
+              {o.note && (
+                  <div className="mt-3 p-2 bg-yellow-50 border-l-4 border-yellow-500 text-sm text-gray-800">
+                      <strong>Not:</strong> {o.note}
+                  </div>
+              )}
 
               <ul className="mt-2 list-disc ml-6 text-gray-700 text-sm">
                 {o.items?.map((it, i) => (
-                  <li key={i}>
-                    {it.name} × {it.qty}
-                  </li>
+                  <li key={i}>{it.name} × {it.qty}</li>
                 ))}
               </ul>
 
               <div className="mt-3 flex gap-2">
                 <button
                   className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-                  onClick={() =>
-                    handleStatusChange(o.tableId, o.id, "Hazırlanıyor")
-                  }
+                  onClick={() => handleStatusChange(o, "Hazırlanıyor")}
                 >
-                  Hazırlanıyor
+                  👨‍🍳 Hazırlanıyor
                 </button>
                 <button
                   className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800"
-                  onClick={() => handleStatusChange(o.tableId, o.id, "Hazır")}
+                  onClick={() => handleStatusChange(o, "Hazır")}
                 >
-                  Hazır
+                  ✅ Hazır
                 </button>
               </div>
             </li>
