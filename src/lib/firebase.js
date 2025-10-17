@@ -1,3 +1,5 @@
+// src/lib/firebase.js
+
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
@@ -9,14 +11,16 @@ import {
   doc,
   setDoc,
   getDoc,
-  getDocs, // 🔹 EKLENDİ
+  getDocs,
   onSnapshot,
   serverTimestamp,
   query,
   orderBy,
   where,
 } from "firebase/firestore";
-import { getAuth } from "firebase/auth"; // 🔹 Authentication eklendi
+import { getAuth } from "firebase/auth";
+// 🚀 YENİ İMPORTLAR: Firebase Storage
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"; 
 
 // 🔐 .env dosyandaki Firebase bilgilerini kullan
 const firebaseConfig = {
@@ -31,11 +35,13 @@ const firebaseConfig = {
 // 🔹 Firebase başlatma
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); // ✅ getAuth uygulamaya bağlandı
+const auth = getAuth(app); 
+// 🚀 YENİ: Storage'ı başlat
+const storage = getStorage(app); 
 
 export {
   db,
-  auth, // ✅ eklendi
+  auth, 
   collection,
   collectionGroup,
   addDoc,
@@ -44,10 +50,16 @@ export {
   doc,
   setDoc,
   getDoc,
-  getDocs, // 🔹 EKLENDİ
+  getDocs,
   onSnapshot,
   serverTimestamp,
   query,
   orderBy,
   where,
+  // 🚀 YENİ EXPORTLAR: Storage
+  storage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
 };
