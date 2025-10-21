@@ -1,0 +1,72 @@
+/* src/pages/UserPanel.css */
+
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.user-list-item {
+  display: flex;
+  flex-direction: column; /* MOBİL UYUMLULUK: (Mobile-First) Dikey diz */
+  gap: 1rem;
+  padding: 1rem;
+  background-color: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+}
+/* MOBİL UYUMLULUK: Tablet ve üstü (Yatay diz) */
+@media (min-width: 768px) {
+  .user-list-item {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-email {
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.user-role {
+  font-size: 0.9rem;
+  color: var(--text-light);
+}
+
+.user-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.user-actions .form-select {
+  width: auto;
+  flex: 1; /* MOBİL UYUMLULUK: Mobilde alanı doldur */
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.user-actions .button {
+  padding: 0.5rem 0.8rem;
+  font-size: 0.9rem;
+  flex: 0 1 auto; /* MOBİL UYUMLULUK: Küçül, büyüme */
+}
+
+/* MOBİL UYUMLULUK: Tablet ve üstü */
+@media (min-width: 768px) {
+  .user-actions .form-select {
+    flex: 0 1 auto; /* Geri al */
+  }
+}
+
+
+.modal-add-user {
+  max-width: 450px;
+}

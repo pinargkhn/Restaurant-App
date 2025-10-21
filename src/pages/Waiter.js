@@ -1,3 +1,4 @@
+// src/pages/Waiter.js
 import React, { useState, useEffect, useMemo } from "react";
 import {
   collection,
@@ -13,14 +14,14 @@ import {
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { submitOrder, moveToPastOrders } from "../lib/orders";
-import useProducts from "../hooks/useProducts"; 
+import useProducts from "../hooks/useProducts";
+import './Waiter.css'; // 👈 YENİ CSS İÇE AKTAR
 
 // -------------------------------------------------------------
 // 🔹 HELPER FONKSİYONLAR
 // -------------------------------------------------------------
-// Hata Düzeltme: 'combined' değişkeni tanımlanarak 'no-undef' hatası giderildi.
 const mergeItems = (orders) => {
-    const combined = {}; // ✅ DÜZELTME: combined tanımlandı
+    const combined = {};
     orders.forEach((o) =>
       (o.items || []).forEach((it) => {
         const qty = Number(it.qty) || 0;
@@ -68,24 +69,23 @@ const mergeOrdersByTable = (all) => {
     });
 };
 
-const getBgColor = (o) => {
-    if (o.newItemsAdded) return "bg-red-100";
+// 🔹 CSS Sınıfı döndüren helper
+const getCardClass = (o) => {
+    if (o.newItemsAdded) return "status-new-items";
     switch (o.status) {
       case "Hazır":
-        return "bg-green-100";
+        return "status-ready";
       case "Hazırlanıyor":
-        return "bg-yellow-100";
+        return "status-preparing";
       default:
-        return "bg-white";
+        return "status-new";
     }
 };
 
-// Hata Düzeltme: 'at' ve 'bt' değişkenleri tanımlanarak 'no-undef' hatası giderildi.
 const compareOrders = (a, b) => {
     if (a.newItemsAdded && !b.newItemsAdded) return -1;
     if (!a.newItemsAdded && b.newItemsAdded) return 1;
     
-    // ✅ DÜZELTME: at ve bt değişkenleri tanımlandı
     const at = a.updatedAt?.seconds||a.createdAt?.seconds||0;
     const bt = b.updatedAt?.seconds||b.createdAt?.seconds||0; 
     
@@ -118,7 +118,6 @@ export default function Waiter() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState("");
   
-  // ---------------- Hata Düzeltme: Toplam Hesaplama ----------------
   const calculateTotal = (arr) =>
       arr.reduce((acc, item) => acc + (Number(item.qty) || 0) * (Number(item.price) || 0), 0);
 
@@ -206,7 +205,7 @@ export default function Waiter() {
     ).sort(compareOrders);
   }, [activeTab, search, activeOrders, deliveredOrders, paidOrders]);
   
-  // ---------------- Yeni Sipariş / Düzenleme Fonksiyonları (Aynı kalır) ----------------
+  // ---------------- Yeni Sipariş / Düzenleme Fonksiyonları ----------------
   
   const addNewItemToCart = (item) => {
     const existing = newOrderCart.find(p => p.id === item.id);
@@ -281,7 +280,7 @@ export default function Waiter() {
       }
   };
   
-  // ---------------- Diğer Garson İşlevleri (Aynı kalır) ----------------
+  // ---------------- Diğer Garson İşlevleri ----------------
   
   const markDelivered = async (o) => {
     if (!window.confirm(`${o.tableId} masası için siparişler teslim edildi mi?`)) return;
@@ -342,19 +341,19 @@ export default function Waiter() {
   
   if (loadingProducts) {
       return (
-        <div className="flex items-center justify-center h-screen text-lg font-semibold text-gray-600">
+        <div className="menu-loading-screen">
           Menü verileri yükleniyor...
         </div>
       );
   }
   
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3 border-b pb-2">
-            <h2 className="text-2xl font-bold">🧑‍💼 Garson Paneli</h2>
+    <div className="waiter-container">
+        <div className="waiter-header">
+            <h2 className="waiter-title">🧑‍💼 Garson Paneli</h2>
             <button 
                 onClick={openTableInputModal}
-                className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 font-semibold transition"
+                className="button button-green"
             >
                 ➕ Yeni Sipariş Başlat
             </button>
@@ -363,33 +362,27 @@ export default function Waiter() {
                 placeholder="Masa ara..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="border rounded px-3 py-2 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="form-input search-input"
             />
         </div>
 
         {/* Sekmeler */}
-        <div className="flex border-b border-gray-300 mb-4">
+        <div className="tab-nav">
             <button
                 onClick={() => setActiveTab("active")}
-                className={`px-4 py-2 font-semibold ${
-                  activeTab === "active" ? "border-b-2 border-blue-600" : ""
-                }`}
+                className={`tab-button ${activeTab === "active" ? "active" : ""}`}
             >
                 Aktif Siparişler
             </button>
             <button
                 onClick={() => setActiveTab("delivered")}
-                className={`px-4 py-2 font-semibold ${
-                  activeTab === "delivered" ? "border-b-2 border-blue-600" : ""
-                }`}
+                className={`tab-button ${activeTab === "delivered" ? "active" : ""}`}
             >
                 Teslim Edilenler
             </button>
             <button
                 onClick={() => setActiveTab("paid")}
-                className={`px-4 py-2 font-semibold ${
-                  activeTab === "paid" ? "border-b-2 border-blue-600" : ""
-                }`}
+                className={`tab-button ${activeTab === "paid" ? "active" : ""}`}
             >
                 Ödemesi Alınanlar (Son 24 Saat)
             </button>
@@ -397,118 +390,115 @@ export default function Waiter() {
 
 
         {/* Sipariş Listesi */}
-        {filteredList.length === 0 && (
-            <p className="text-gray-500 mt-4">Bu sekmede gösterilecek sipariş bulunmamaktadır.</p>
-        )}
-        {filteredList.map((o) => (
-            <div 
-                key={o.tableId + (activeTab === 'paid' ? o.updatedAt?.seconds || o.movedAt?.seconds : '')} 
-                className={`p-3 border rounded mb-3 ${getBgColor(o)}`} 
-            >
-                <div className="flex justify-between items-center">
-                    <p className="font-semibold">
-                        Masa: {o.tableId}
-                        {activeTab !== 'paid' && (
-                            <span className="text-sm text-gray-500 ml-2">
-                                ({o.status})
-                            </span>
-                        )}
-                        {activeTab === 'paid' && (
-                            <span className="text-sm text-gray-500 ml-2">
-                                ({o.paymentMethod})
-                            </span>
-                        )}
+        <div className="waiter-order-list">
+            {filteredList.length === 0 && (
+                <p className="empty-text">Bu sekmede gösterilecek sipariş bulunmamaktadır.</p>
+            )}
+            {filteredList.map((o) => (
+                <div 
+                    key={o.tableId + (activeTab === 'paid' ? o.updatedAt?.seconds || o.movedAt?.seconds : '')} 
+                    className={`waiter-order-card ${activeTab !== 'paid' ? getCardClass(o) : 'status-paid'}`} 
+                >
+                    <div className="card-header">
+                        <p className="table-id">
+                            Masa: {o.tableId}
+                            {activeTab !== 'paid' && (
+                                <span className="order-status">({o.status})</span>
+                            )}
+                            {activeTab === 'paid' && (
+                                <span className="order-status">({o.paymentMethod})</span>
+                            )}
+                        </p>
+                        <p className="order-total">{o.total.toFixed(2)} ₺</p>
+                    </div>
+                    
+                    {o.newItemsAdded && activeTab !== 'paid' && (
+                        <p className="new-item-alert">
+                            ⚠️ Yeni ürün eklendi – Mutfaktan onay bekleniyor
+                        </p>
+                    )}
+                    
+                    {o.note && (
+                        <div className="order-note">
+                            <strong>Not:</strong> {o.note}
+                        </div>
+                    )}
+
+                    <p className="order-items-text">
+                        <strong>Ürünler:</strong>{" "}
+                        {o.items?.map((i) => `${i.name} ×${i.qty}`).join(", ")}
                     </p>
-                    <p className="font-semibold">{o.total.toFixed(2)} ₺</p>
+
+                    {/* Butonlar */}
+                    {activeTab !== 'paid' && (
+                        <div className="card-actions">
+                            <button
+                                onClick={() => openEditModal(o)}
+                                className="button button-blue"
+                            >
+                                ✏️ Düzenle
+                            </button>
+                            {o.status !== "Teslim Edildi" && (
+                                <button
+                                    onClick={() => markDelivered(o)}
+                                    className="button button-green"
+                                >
+                                    🚚 Teslim Edildi
+                                </button>
+                            )}
+                            {o.status === "Teslim Edildi" && (
+                                <button
+                                    onClick={() => openPayment(o)}
+                                    className="button"
+                                    style={{backgroundColor: 'var(--primary-purple)', color: 'white'}}
+                                >
+                                    💰 Ödeme Al
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
-                
-                {o.newItemsAdded && activeTab !== 'paid' && (
-                    <p className="text-red-600 text-sm font-semibold mt-1 animate-pulse">
-                        ⚠️ Yeni ürün eklendi – Mutfaktan onay bekleniyor
-                    </p>
-                )}
-                
-                {o.note && (
-                    <div className="mt-2 p-2 bg-yellow-50 border-l-4 border-yellow-500 text-sm text-gray-800">
-                        <strong>Not:</strong> {o.note}
-                    </div>
-                )}
-
-                <p className="text-sm text-gray-700 mt-1">
-                    <strong>Ürünler:</strong>{" "}
-                    {o.items?.map((i) => `${i.name} ×${i.qty}`).join(", ")}
-                </p>
-
-                {/* Butonlar */}
-                {activeTab !== 'paid' && (
-                    <div className="flex gap-2 mt-3">
-                        <button
-                            onClick={() => openEditModal(o)}
-                            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                        >
-                            ✏️ Düzenle
-                        </button>
-                        {o.status !== "Teslim Edildi" && (
-                            <button
-                                onClick={() => markDelivered(o)}
-                                className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-                            >
-                                🚚 Teslim Edildi
-                            </button>
-                        )}
-                        {o.status === "Teslim Edildi" && (
-                            <button
-                                onClick={() => openPayment(o)}
-                                className="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
-                            >
-                                💰 Ödeme Al
-                            </button>
-                        )}
-                    </div>
-                )}
-            </div>
-        ))}
+            ))}
+        </div>
 
 
-        {/* Yeni Sipariş Oluşturma Modalı (Aynı kalır) */}
+        {/* Yeni Sipariş Oluşturma Modalı */}
         {showTableInputModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-            <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
-                <h3 className="text-xl font-bold mb-4">Yeni Sipariş Başlat: Masa Seçimi</h3>
+          <div className="modal-overlay">
+            <div className="modal-content modal-order-edit">
+                <h3 className="modal-title">Yeni Sipariş Başlat: Masa Seçimi</h3>
                 
-                <div className="mb-4">
+                <div className="form-group">
                     <input
                         type="text"
                         placeholder="Masa ID girin (örn: masa_1)"
                         value={newOrderTableId}
                         onChange={(e) => setNewTableId(e.target.value)}
-                        className="border p-2 rounded w-full focus:ring-blue-500 focus:border-blue-500"
+                        className="form-input"
                     />
                 </div>
 
-                <h4 className="font-semibold mb-2">Menü</h4>
-                <div className="flex mb-4 overflow-x-auto border-b pb-1">
+                <h4 className="modal-subtitle">Menü</h4>
+                <div className="modal-category-nav">
                     {CATEGORIES.map(cat => (
                         <button
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
-                            className={`px-3 py-1 text-sm rounded transition-all flex-shrink-0 ${
-                                activeCategory === cat ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 ml-1'
-                            }`}
+                            className={`modal-cat-button ${activeCategory === cat ? 'active' : ''}`}
                         >
                             {cat}
                         </button>
                     ))}
                 </div>
 
-                <div className="mb-4 max-h-48 overflow-y-auto border p-2 rounded">
-                    <ul className="space-y-2">
+                <div className="modal-menu-items">
+                    <ul className="modal-items-list">
                         {(groupedProducts[activeCategory] || []).map(item => (
-                            <li key={item.id} className="flex justify-between items-center p-2 border-b last:border-b-0">
+                            <li key={item.id} className="menu-item">
                                 <span>{item.name} ({item.price} ₺)</span>
                                 <button
                                     onClick={() => addNewItemToCart(item)}
-                                    className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
+                                    className="button button-green"
                                 >
                                     Ekle
                                 </button>
@@ -517,36 +507,36 @@ export default function Waiter() {
                     </ul>
                 </div>
 
-                <h4 className="font-semibold mb-2">Sepet ({newOrderCart.length} ürün, Toplam: {newOrderTotal.toFixed(2)} ₺)</h4>
-                <ul className="mb-4 space-y-2 max-h-48 overflow-y-auto border p-2 rounded bg-gray-50">
+                <h4 className="modal-subtitle">Sepet ({newOrderCart.length} ürün, Toplam: {newOrderTotal.toFixed(2)} ₺)</h4>
+                <ul className="modal-cart-preview">
                     {newOrderCart.map(item => (
-                        <li key={item.id} className="flex justify-between items-center text-sm">
+                        <li key={item.id} className="cart-preview-item">
                             <span>{item.name} x{item.qty}</span>
-                            <div className="flex gap-2">
+                            <div className="cart-preview-controls">
                                 <button
                                     onClick={() => setNewOrderCart(prev => prev.map(p => p.id === item.id ? {...p, qty: p.qty - 1} : p).filter(p => p.qty > 0))}
-                                    className="px-2 bg-gray-300 rounded text-black"
+                                    className="qty-button"
                                 >-</button>
                                 <button
                                     onClick={() => setNewOrderCart(prev => prev.map(p => p.id === item.id ? {...p, qty: p.qty + 1} : p))}
-                                    className="px-2 bg-gray-300 rounded text-black"
+                                    className="qty-button"
                                 >+</button>
                             </div>
                         </li>
                     ))}
                 </ul>
 
-                <div className="flex justify-between gap-3 mt-4">
+                <div className="modal-actions">
                     <button
                         onClick={() => setShowTableInputModal(false)}
-                        className="bg-gray-500 text-white px-4 py-2 rounded flex-1 hover:bg-gray-600"
+                        className="button button-secondary"
                     >
                         Kapat
                     </button>
                     <button
                         onClick={handleNewOrderSubmit}
                         disabled={!newOrderTableId || newOrderCart.length === 0}
-                        className="bg-blue-600 text-white px-4 py-2 rounded flex-1 hover:bg-blue-700 disabled:bg-gray-400"
+                        className="button button-blue"
                     >
                         Siparişi Başlat
                     </button>
@@ -557,33 +547,31 @@ export default function Waiter() {
         
         {/* Sipariş Düzenleme Modalı */}
         {showEditModal && editOrder && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-             <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
-                <h3 className="text-xl font-bold mb-4">Masa {editOrder.tableId} Siparişini Düzenle</h3>
+          <div className="modal-overlay">
+             <div className="modal-content modal-order-edit">
+                <h3 className="modal-title">Masa {editOrder.tableId} Siparişini Düzenle</h3>
                 
-                <h4 className="font-semibold mb-2">Menüden Ürün Ekle</h4>
-                <div className="flex mb-4 overflow-x-auto border-b pb-1">
+                <h4 className="modal-subtitle">Menüden Ürün Ekle</h4>
+                <div className="modal-category-nav">
                     {CATEGORIES.map(cat => (
                         <button
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
-                            className={`px-3 py-1 text-sm rounded transition-all flex-shrink-0 ${
-                                activeCategory === cat ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 ml-1'
-                            }`}
+                            className={`modal-cat-button ${activeCategory === cat ? 'active' : ''}`}
                         >
                             {cat}
                         </button>
                     ))}
                 </div>
 
-                <div className="mb-4 max-h-48 overflow-y-auto border p-2 rounded">
-                    <ul className="space-y-2">
+                <div className="modal-menu-items">
+                    <ul className="modal-items-list">
                         {(groupedProducts[activeCategory] || []).map(item => (
-                            <li key={item.id} className="flex justify-between items-center p-2 border-b last:border-b-0">
+                            <li key={item.id} className="menu-item">
                                 <span>{item.name} ({item.price} ₺)</span>
                                 <button
                                     onClick={() => addEditItemToCart(item)}
-                                    className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
+                                    className="button button-green"
                                 >
                                     Ekle
                                 </button>
@@ -592,19 +580,19 @@ export default function Waiter() {
                     </ul>
                 </div>
 
-                <h4 className="font-semibold mb-2">Güncel Sipariş ({editCart.length} ürün, Toplam: {editOrderTotal.toFixed(2)} ₺)</h4>
-                <ul className="mb-4 space-y-2 max-h-48 overflow-y-auto border p-2 rounded bg-gray-50">
+                <h4 className="modal-subtitle">Güncel Sipariş ({editCart.length} ürün, Toplam: {editOrderTotal.toFixed(2)} ₺)</h4>
+                <ul className="modal-cart-preview">
                     {editCart.map(item => (
-                        <li key={item.id} className="flex justify-between items-center text-sm">
+                        <li key={item.id} className="cart-preview-item">
                             <span>{item.name} x{item.qty}</span>
-                            <div className="flex gap-2">
+                            <div className="cart-preview-controls">
                                 <button
                                     onClick={() => setEditCart(prev => prev.map(p => p.id === item.id ? {...p, qty: p.qty - 1} : p).filter(p => p.qty > 0))}
-                                    className="px-2 bg-gray-300 rounded text-black"
+                                    className="qty-button"
                                 >-</button>
                                 <button
                                     onClick={() => setEditCart(prev => prev.map(p => p.id === item.id ? {...p, qty: p.qty + 1} : p))}
-                                    className="px-2 bg-gray-300 rounded text-black"
+                                    className="qty-button"
                                 >+</button>
                             </div>
                         </li>
@@ -612,23 +600,23 @@ export default function Waiter() {
                 </ul>
                 
                 {editOrder.note && (
-                    <div className="mt-2 p-2 bg-yellow-50 border-l-4 border-yellow-500 text-sm text-gray-800 mb-4">
+                    <div className="order-note" style={{margin: '1rem 0'}}>
                         <strong>Müşteri Notu:</strong> {editOrder.note}
                     </div>
                 )}
 
 
-                <div className="flex justify-between gap-3 mt-4">
+                <div className="modal-actions">
                     <button
                         onClick={() => setShowEditModal(false)}
-                        className="bg-gray-500 text-white px-4 py-2 rounded flex-1 hover:bg-gray-600"
+                        className="button button-secondary"
                     >
                         Kapat
                     </button>
                     <button
                         onClick={handleEditOrderSave}
                         disabled={editCart.length === 0 || isSaving}
-                        className="bg-red-600 text-white px-4 py-2 rounded flex-1 hover:bg-red-700 disabled:bg-gray-400"
+                        className="button button-danger"
                     >
                         {isSaving ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet & Mutfağa Gönder'}
                     </button>
@@ -639,17 +627,17 @@ export default function Waiter() {
         
         {/* Ödeme Modalı */}
         {showPaymentModal && selectedOrder && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
-              <h3 className="text-xl font-bold mb-4">💰 Ödeme Yöntemi Seç</h3>
-              <p className="mb-4 text-gray-700">
+          <div className="modal-overlay">
+            <div className="modal-content modal-payment">
+              <h3 className="modal-title">💰 Ödeme Yöntemi Seç</h3>
+              <p className="payment-details">
                 Masa: <strong>{selectedOrder.tableId}</strong>
                 <br />
                 Toplam: <strong>{selectedOrder.total.toFixed(2)} ₺</strong>
               </p>
-              <div className="flex flex-col gap-3">
+              <div className="payment-actions">
                 <button
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  className="button button-blue"
                   onClick={() => {
                     setPaymentMethod("Kart");
                     confirmPayment();
@@ -658,7 +646,7 @@ export default function Waiter() {
                   💳 Kredi/Banka Kartı
                 </button>
                 <button
-                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                  className="button button-green"
                   onClick={() => {
                     setPaymentMethod("Nakit");
                     confirmPayment();
@@ -668,7 +656,7 @@ export default function Waiter() {
                 </button>
               </div>
               <button
-                className="mt-4 text-gray-500 hover:text-black"
+                className="payment-cancel-button"
                 onClick={() => {
                   setShowPaymentModal(false);
                   setSelectedOrder(null);

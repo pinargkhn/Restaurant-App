@@ -1,0 +1,211 @@
+/* src/pages/AdminDashboard.css */
+.admin-container {
+  /* MOBİL UYUMLULUK: Mobilde kenar boşlukları */
+  padding: 1rem;
+  margin: 1rem auto;
+  max-width: 1140px;
+}
+
+@media (min-width: 768px) {
+  .admin-container {
+    padding: 1.5rem;
+  }
+}
+
+.admin-title {
+  /* MOBİL UYUMLULUK: Mobilde başlık fontu küçültüldü */
+  font-size: 1.75rem;
+  text-align: center;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+}
+
+.admin-nav {
+  display: flex;
+  /* MOBİL UYUMLULUK: Butonları alt alta diz */
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  background-color: var(--white);
+  margin-bottom: 1.5rem;
+}
+.admin-nav .button {
+  font-size: 1rem;
+  width: 100%; /* MOBİL UYUMLULUK: Butonlar tam genişlik */
+}
+
+/* MOBİL UYUMLULUK: Tablet ve üstü */
+@media (min-width: 768px) {
+  .admin-title {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+  }
+  .admin-nav {
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+  .admin-nav .button {
+    width: auto; /* Genişliği geri al */
+  }
+}
+
+
+/* Özel Admin Renkleri */
+.nav-button-menu { background-color: var(--primary-pink); color: var(--white); }
+.nav-button-menu:hover { background-color: #b02a70; }
+.nav-button-tables { background-color: var(--primary-purple); color: var(--white); }
+.nav-button-tables:hover { background-color: #5a359a; }
+.nav-button-users { background-color: var(--primary-indigo); color: var(--white); }
+.nav-button-users:hover { background-color: #520de4; }
+
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* MOBİL UYUMLULUK: (Mobile-First) Tek sütun */
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+/* MOBİL UYUMLULUK: Tablet ve üstü (3 sütun) */
+@media (min-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+    margin-bottom: 2rem;
+  }
+}
+
+.stat-card {
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  background-color: var(--background-light);
+}
+.stat-card:nth-child(1) { background-color: #cff4fc; } /* Mavi */
+.stat-card:nth-child(2) { background-color: #d1e7dd; } /* Yeşil */
+.stat-card:nth-child(3) { background-color: #fff3cd; } /* Sarı */
+
+.stat-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+}
+.stat-value.paid { color: var(--primary-green); }
+.stat-value.prep-time { color: #664d03; }
+
+.chart-container-wrapper {
+  background-color: var(--white);
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1.5rem;
+}
+@media (min-width: 768px) {
+  .chart-container-wrapper {
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+}
+
+
+.prep-time-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* MOBİL UYUMLULUK: Tek Sütun */
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+/* MOBİL UYUMLULUK: Büyük ekranlar (2 sütun) */
+@media (min-width: 992px) {
+  .prep-time-grid {
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 2rem;
+  }
+}
+
+.prep-time-list-container {
+  background-color: var(--white);
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+@media (min-width: 768px) {
+  .prep-time-list-container {
+    padding: 1.5rem;
+  }
+}
+
+.prep-time-list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.prep-time-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color-light);
+  background-color: #fffbeb;
+  border-radius: 6px;
+}
+.prep-time-item:last-child {
+  border-bottom: none;
+}
+
+.prep-time-header {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.prep-time-items {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin: 0.25rem 0 0 0;
+}
+.prep-time-duration {
+  font-weight: 700;
+  font-size: 1rem; /* MOBİL UYUMLULUK: Mobilde font küçültüldü */
+  color: var(--danger-red);
+  flex-shrink: 0;
+  margin-left: 1rem;
+}
+@media (min-width: 768px) {
+  .prep-time-duration {
+    font-size: 1.1rem;
+  }
+}
+
+.table-responsive-wrapper {
+  overflow-x: auto; /* MOBİL UYUMLULUK: Tabloların taşmasını sağlar */
+  background-color: var(--white);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+.data-table .cell-total {
+  font-weight: 600;
+  text-align: right;
+}
+.data-table .cell-payment {
+  font-weight: 500;
+  color: var(--primary-green);
+}
+.data-table .cell-prep-time {
+  text-align: center;
+  white-space: nowrap;
+}
+.data-table .cell-date {
+  white-space: nowrap;
+}

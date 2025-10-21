@@ -1,6 +1,7 @@
 // src/pages/Kitchen.js
 import { useEffect, useState } from "react";
 import { db, collection, onSnapshot, doc, updateDoc, serverTimestamp } from "../lib/firebase";
+import './Kitchen.css'; // 👈 YENİ CSS İÇE AKTAR
 
 export default function Kitchen() {
   const [orders, setOrders] = useState([]);
@@ -64,12 +65,13 @@ export default function Kitchen() {
     });
   };
 
-  const getBgColor = (order) => {
-    if (order.newItemsAdded) return "bg-red-100";     // ⚠️ yeni ürün → kırmızı
+  // 🔹 CSS Sınıfı döndüren helper
+  const getCardClass = (order) => {
+    if (order.newItemsAdded) return "status-new-items"; // ⚠️ yeni ürün
     switch (order.status) {
-      case "Hazırlanıyor": return "bg-yellow-100";
-      case "Hazır":        return "bg-green-200";
-      default:             return "bg-white";
+      case "Hazırlanıyor": return "status-preparing";
+      case "Hazır":        return "status-ready";
+      default:             return "status-new";
     }
   };
 
@@ -83,7 +85,7 @@ export default function Kitchen() {
     return bt - at;
   };
 
-  // ---------------- FIRESTORE DİNLEME (Aynı kalır) ----------------
+  // ---------------- FIRESTORE DİNLEME ----------------
   useEffect(() => {
     const tablesRef = collection(db, "tables");
     const unsubTables = onSnapshot(tablesRef, (tablesSnap) => {
@@ -104,7 +106,7 @@ export default function Kitchen() {
     return () => unsubTables();
   }, []);
 
-  // ---------------- Durum Güncelleme (Aynı kalır) ----------------
+  // ---------------- Durum Güncelleme ----------------
   const handleStatusChange = async (mergedOrder, newStatus) => {
     if (!mergedOrder.tableId) return;
     try {
@@ -139,52 +141,51 @@ export default function Kitchen() {
 
   // ---------------- RENDER ----------------
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">🍳 Mutfak Paneli</h2>
-      {!orders.length && <p className="text-gray-500">Henüz sipariş yok.</p>}
+    <div className="kitchen-container">
+      <h2 className="kitchen-title">🍳 Mutfak Paneli</h2>
+      {!orders.length && <p className="empty-text">Henüz sipariş yok.</p>}
 
-      <ul className="space-y-4">
+      <ul className="kitchen-order-list">
         {orders
           .filter(o => o.status !== "Teslim Edildi")
           .sort(compareOrders)
           .map(o => (
-            <li key={o.tableId} className={`rounded shadow p-4 ${getBgColor(o)}`}>
-              <div className="flex justify-between items-center">
-                <span className="font-semibold">
+            <li key={o.tableId} className={`kitchen-order-card ${getCardClass(o)}`}>
+              <div className="card-header">
+                <span className="table-id">
                   Masa: {o.tableId}
-                  {o.newItemsAdded && (
-                    <span className="ml-2 text-red-600 font-semibold animate-pulse">
-                      ⚠️ Yeni ürün eklendi – Garson bilgilendirildi
-                    </span>
-                  )}
                 </span>
-                <span className="text-sm px-2 py-1 rounded bg-gray-100">
+                {o.newItemsAdded && (
+                  <span className="new-item-alert">
+                    ⚠️ Yeni ürün eklendi – Garson bilgilendirildi
+                  </span>
+                )}
+                <span className="order-status-badge">
                   {o.status}
                 </span>
               </div>
               
-              {/* 🚀 YENİ ALAN: SİPARİŞ NOTU */}
               {o.note && (
-                  <div className="mt-3 p-2 bg-yellow-50 border-l-4 border-yellow-500 text-sm text-gray-800">
+                  <div className="order-note">
                       <strong>Not:</strong> {o.note}
                   </div>
               )}
 
-              <ul className="mt-2 list-disc ml-6 text-gray-700 text-sm">
+              <ul className="order-items-list">
                 {o.items?.map((it, i) => (
                   <li key={i}>{it.name} × {it.qty}</li>
                 ))}
               </ul>
 
-              <div className="mt-3 flex gap-2">
+              <div className="card-actions">
                 <button
-                  className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                  className="button button-yellow"
                   onClick={() => handleStatusChange(o, "Hazırlanıyor")}
                 >
                   👨‍🍳 Hazırlanıyor
                 </button>
                 <button
-                  className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800"
+                  className="button button-green"
                   onClick={() => handleStatusChange(o, "Hazır")}
                 >
                   ✅ Hazır

@@ -1,3 +1,4 @@
+// src/context/CartContext.js
 import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { db } from "../lib/firebase";
@@ -15,25 +16,21 @@ export function useCart() {
 // Provider Componenti
 export function CartProvider({ children }) {
   // Sepet yapısı: { items: [], total: 0, note: "" }
-  const [cart, setCart] = useState({ items: [], total: 0, note: "" }); // 🔹 NOTE EKLENDİ
+  const [cart, setCart] = useState({ items: [], total: 0, note: "" });
   const [params] = useSearchParams();
   const tableId = params.get("table");
 
   // ---------------- FIRESTORE SYNC (READ) ----------------
-  // Firestore'daki masanın cart alanını dinler
   useEffect(() => {
     if (!tableId) return;
 
     const tableRef = doc(db, "tables", tableId);
     const unsub = onSnapshot(tableRef, (snap) => {
-      const data = snap.data()?.cart || { items: [], total: 0, note: "" }; // 🔹 NOTE OKUNDU
-      // Sadece cart.items ve cart.total değiştiyse güncelle, note'a dokunma
+      const data = snap.data()?.cart || { items: [], total: 0, note: "" };
       setCart(prev => ({
           ...prev,
           items: data.items,
           total: data.total,
-          // note: data.note, // NOTE'u buradan okumayıp local state'te tutuyoruz ki,
-                            // kullanıcının yazdığı not anlık olarak silinmesin.
       }));
     });
 
@@ -49,7 +46,6 @@ export function CartProvider({ children }) {
     if (!tableId) return;
     try {
       const tableRef = doc(db, "tables", tableId);
-      // NOTE'u Firestore'a kaydederken, mevcut local state'ten alıyoruz.
       await setDoc(tableRef, {
         cart: {
           items: newItems,
@@ -99,15 +95,12 @@ export function CartProvider({ children }) {
   };
 
   const clearCart = () => {
-    setCart({ items: [], total: 0, note: "" }); // 🔹 NOTE TEMİZLENDİ
+    setCart({ items: [], total: 0, note: "" });
     updateFirestore([], 0);
   };
   
-  // 🔹 YENİ FONKSİYON: Sipariş notunu güncelle
   const updateNote = (newNote) => {
       setCart(prev => ({ ...prev, note: newNote }));
-      // Firestore'a anlık kaydetmiyoruz, sadece sepete eklerken veya sipariş gönderilirken kaydedeceğiz.
-      // updateFirestore(cart.items, cart.total); // Anlık kaydı yoruma aldık
   };
 
   // Sipariş gönderme (NOTE'u gönderir)
@@ -136,7 +129,7 @@ export function CartProvider({ children }) {
     updateItemQty,
     clearCart,
     placeOrder,
-    updateNote, // 🔹 YENİ FONKSİYON EKLENDİ
+    updateNote,
   }), [cart, tableId]);
 
   return (

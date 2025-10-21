@@ -1,8 +1,10 @@
+// src/pages/Login.js
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import './Login.css'; // 👈 YENİ CSS İÇE AKTAR
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -39,31 +41,31 @@ export default function Login() {
   };
 
   return (
-    <div className="p-6 max-w-sm mx-auto mt-10 border rounded shadow">
-      <h2 className="text-2xl font-bold mb-4 text-center">Giriş Yap</h2>
-      <form onSubmit={handleLogin} className="flex flex-col gap-3">
+    <div className="login-container">
+      <h2 className="login-title">Giriş Yap</h2>
+      <form onSubmit={handleLogin} className="login-form">
         <input
           type="email"
           placeholder="E-posta"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="border p-2 rounded"
+          className="form-input"
         />
         <input
           type="password"
           placeholder="Şifre"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="border p-2 rounded"
+          className="form-input"
         />
         <button
           type="submit"
-          className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+          className="button button-primary"
         >
           Giriş Yap
         </button>
       </form>
-      {error && <p className="text-red-600 mt-3">{error}</p>}
+      {error && <p className="form-error">{error}</p>}
     </div>
   );
 }

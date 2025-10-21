@@ -13,24 +13,17 @@ import {
 
 /**
  * 🔹 Yeni sipariş oluşturur (her zaman yeni belge olarak)
- * @param {string} tableId - Masa ID'si.
- * @param {Array} items - Sipariş ürünleri dizisi.
- * @param {number} total - Toplam fiyat.
- * @param {string} [note=""] - Müşteri tarafından eklenen sipariş notu.
- * @param {boolean} [isModification=false] - Eğer bu sipariş Garson tarafından yapılan bir düzenleme sonucu oluştuysa true olur.
  */
 export async function submitOrder({ tableId, items, total, note = "", isModification = false }) { 
   try {
     const ordersRef = collection(db, "tables", tableId, "orders");
 
-    // ✅ Aynı masada hali hazırda AKTİF sipariş var mı kontrol et
     const snap = await getDocs(ordersRef);
     const hasActive = snap.docs.some((d) => {
       const o = d.data() || {};
       return o.paymentStatus !== "Alındı" && o.status !== "Teslim Edildi";
     });
 
-    // Items dizisini map'le ve qty'yi sayıya çevir
     const preparedItems = items.map(item => ({
         ...item,
         qty: Number(item.qty)
@@ -44,7 +37,7 @@ export async function submitOrder({ tableId, items, total, note = "", isModifica
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       newItemsAdded: hasActive, 
-      paymentStatus: "Bekleniyor", // Eski koddaki Bekleniyor durumunu koruduk
+      paymentStatus: "Bekleniyor",
       note: note, // 🚀 NOTE BURAYA EKLENDİ!
     };
 
@@ -59,7 +52,7 @@ export async function submitOrder({ tableId, items, total, note = "", isModifica
 }
 
 /**
- * 🔹 Sipariş durumunu günceller (Hazırlanıyor → Hazır → Teslim Edildi)
+ * 🔹 Sipariş durumunu günceller
  */
 export async function updateOrderStatus(tableId, orderId, newStatus) {
   try {

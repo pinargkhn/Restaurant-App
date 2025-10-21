@@ -1,0 +1,240 @@
+/* src/pages/Waiter.css */
+.waiter-container {
+  /* MOBİL UYUMLULUK: Mobilde kenar boşlukları */
+  padding: 1rem;
+  max-width: 1024px;
+  margin: 1rem auto;
+}
+@media (min-width: 768px) {
+  .waiter-container {
+    padding: 1.5rem;
+  }
+}
+
+
+.waiter-header {
+  display: flex;
+  flex-direction: column; /* MOBİL UYUMLULUK: (Mobile-First) Dikey diz */
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.waiter-header .button {
+  width: 100%;
+}
+.waiter-header .search-input {
+  width: 100%;
+}
+
+/* MOBİL UYUMLULUK: Tablet ve üstü (Yatay diz) */
+@media (min-width: 768px) {
+  .waiter-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .waiter-header .button { width: auto; }
+  .waiter-header .search-input { width: 250px; }
+}
+
+.waiter-title {
+  /* MOBİL UYUMLULUK: Mobilde font küçültüldü */
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+}
+@media (min-width: 768px) {
+  .waiter-title {
+    font-size: 2rem;
+  }
+}
+
+.waiter-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.waiter-order-card {
+  border-radius: 8px;
+  padding: 1rem; /* MOBİL UYUMLULUK: Mobilde padding azaltıldı */
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+}
+@media (min-width: 768px) {
+  .waiter-order-card {
+    padding: 1.5rem;
+  }
+}
+
+/* Durum Renkleri */
+.waiter-order-card.status-new { background-color: var(--white); }
+.waiter-order-card.status-new-items { background-color: var(--danger-red-light); border-color: var(--danger-red); }
+.waiter-order-card.status-preparing { background-color: #fff3cd; }
+.waiter-order-card.status-ready { background-color: #d1e7dd; }
+.waiter-order-card.status-paid { background-color: #e9ecef; border-color: transparent; }
+
+.waiter-order-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.waiter-order-card .table-id {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+.waiter-order-card .order-status {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  margin-left: 0.5rem;
+}
+.waiter-order-card .order-total {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+.waiter-order-card .new-item-alert {
+  font-weight: 600;
+  color: var(--danger-red);
+  margin: 0.5rem 0;
+  animation: pulse 1.5s infinite;
+}
+.waiter-order-card .order-note {
+  background-color: rgba(255, 255, 255, 0.6);
+  border-left: 4px solid var(--primary-yellow);
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+.waiter-order-card .order-items-text {
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  margin: 0.5rem 0;
+}
+.waiter-order-card .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--border-color-light);
+  padding-top: 1rem;
+}
+.waiter-order-card .card-actions .button {
+  /* MOBİL UYUMLULUK: Butonlar sığmazsa büyümesin */
+  flex-grow: 1;
+}
+
+/* Modal İçerikleri */
+.modal-order-edit {
+  max-width: 600px;
+}
+.modal-order-edit .form-group {
+  margin-bottom: 1rem;
+}
+.modal-subtitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.modal-category-nav {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 1rem;
+  background-color: var(--background-light);
+  border-radius: 6px;
+}
+.modal-cat-button {
+  flex-shrink: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  margin: 0.25rem;
+  transition: var(--transition);
+}
+.modal-cat-button.active {
+  background-color: var(--primary-red);
+  color: var(--white);
+}
+.modal-menu-items,
+.modal-cart-preview {
+  max-height: 200px; /* MOBİL UYUMLULUK: Yükseklik sınırı */
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+.modal-cart-preview {
+  background-color: var(--background-light);
+}
+
+.modal-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-color-light);
+}
+.menu-item .button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+}
+.cart-preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+}
+.cart-preview-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cart-preview-controls .qty-button {
+  background-color: var(--white);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  border: none;
+}
+
+/* Ödeme Modalı */
+.modal-payment {
+  max-width: 400px;
+  text-align: center;
+}
+.payment-details {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+.payment-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.payment-actions .button {
+  width: 100%;
+  padding: 0.8rem;
+}
+.payment-cancel-button {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+.payment-cancel-button:hover {
+  color: var(--text-dark);
+}

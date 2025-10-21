@@ -1,7 +1,4 @@
 // src/pages/MenuPanel.js
-
-// src/pages/MenuPanel.js
-
 import { useState, useEffect, useMemo } from "react";
 import { 
   db, 
@@ -12,16 +9,12 @@ import {
   deleteDoc, 
   addDoc,
   getDoc,
-  // 🚀 EKLENDİ: updateDoc, query, orderBy
   updateDoc,
   query,
   orderBy, 
   storage, ref, uploadBytes, getDownloadURL, deleteObject 
 } from "../lib/firebase";
-
-// ... [Kalan kod aynı kalır]
-
-// 🚀 CATEGORIES LİSTESİ KALDIRILDI. ARTIK FIRESTORE'DAN ÇEKİLECEK.
+import './MenuPanel.css'; // 👈 YENİ CSS İÇE AKTAR
 
 // -------------------------------------------------------------------
 // 🔹 Kategori Yönetim Paneli Alt Bileşeni
@@ -47,7 +40,7 @@ function CategoryPanel({ firestoreCategories }) {
             const categoriesRef = collection(db, "categories");
             await addDoc(categoriesRef, { 
                 name: name,
-                // Otomatik sıra numarası (en sonuncunun +1'i)
+                // Otomatik sıra numarası
                 order: firestoreCategories.length > 0 ? Math.max(...firestoreCategories.map(c => c.order || 0)) + 1 : 1,
             });
             setNewCategoryName("");
@@ -73,14 +66,13 @@ function CategoryPanel({ firestoreCategories }) {
         }
     };
     
-    // 🔹 Sıralama güncelleme (Basitçe, yeni bir array oluşturup order'ı set ediyoruz)
+    // 🔹 Sıralama güncelleme
     const handleReorder = async (id, direction) => {
         const index = firestoreCategories.findIndex(c => c.id === id);
         const newIndex = direction === 'up' ? index - 1 : index + 1;
         
         if (newIndex < 0 || newIndex >= firestoreCategories.length) return; // Sınır kontrolü
 
-        // Kategorilerin kopyasını oluşturup yerlerini değiştir
         const newOrder = [...firestoreCategories];
         const [movedCategory] = newOrder.splice(index, 1);
         newOrder.splice(newIndex, 0, movedCategory);
@@ -101,54 +93,53 @@ function CategoryPanel({ firestoreCategories }) {
 
 
     return (
-        <div className="p-4 border rounded-lg shadow mt-4 bg-white">
-            <h4 className="text-lg font-semibold mb-3">Kategori Ekle</h4>
-            <form onSubmit={handleAddCategory} className="flex gap-2 mb-6">
+        <div className="form-container category-panel-container">
+            <h4 className="form-title">Kategori Ekle</h4>
+            <form onSubmit={handleAddCategory} className="category-add-form">
                 <input
                     type="text"
                     placeholder="Yeni Kategori Adı (örn: Spesiyaller)"
                     value={newCategoryName}
                     onChange={(e) => setNewCategoryName(e.target.value)}
-                    className="border p-2 rounded flex-1"
+                    className="form-input"
                     disabled={isSaving}
                     required
                 />
                 <button
                     type="submit"
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+                    className="button button-green"
                     disabled={isSaving || newCategoryName.trim() === ""}
                 >
                     {isSaving ? "Ekleniyor..." : "Ekle"}
                 </button>
             </form>
 
-            <h4 className="text-lg font-semibold mb-3">Mevcut Kategoriler ({firestoreCategories.length})</h4>
-            <p className="text-sm text-gray-500 mb-3">Kategoriler sırası, menüde görünecek sırayı belirler.</p>
-            <ul className="space-y-2">
+            <h4 className="section-title">Mevcut Kategoriler ({firestoreCategories.length})</h4>
+            <p className="panel-note-small">Kategoriler sırası, menüde görünecek sırayı belirler.</p>
+            <ul className="category-list">
                 {firestoreCategories.map((cat, index) => (
-                    <li key={cat.id} className="flex justify-between items-center p-3 bg-gray-50 border rounded">
-                        <span className="font-medium">
+                    <li key={cat.id} className="category-list-item">
+                        <span className="category-name">
                             {index + 1}. {cat.name}
                         </span>
-                        <div className="flex gap-2 items-center">
-                            {/* Sıralama butonları */}
+                        <div className="category-actions">
                             <button
                                 onClick={() => handleReorder(cat.id, 'up')}
                                 disabled={isSaving || index === 0}
-                                className="text-sm px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                                className="button button-icon"
                             >
                                 ↑
                             </button>
                             <button
                                 onClick={() => handleReorder(cat.id, 'down')}
                                 disabled={isSaving || index === firestoreCategories.length - 1}
-                                className="text-sm px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                                className="button button-icon"
                             >
                                 ↓
                             </button>
                             <button
                                 onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                                className="text-sm px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                                className="button button-danger"
                                 disabled={isSaving}
                             >
                                 Sil
@@ -182,7 +173,7 @@ export default function MenuPanel({ onBack }) {
 
   // ---------------- Firestore Dinleme ----------------
   useEffect(() => {
-    // 1. Ürünleri Dinle (Aynı kalır)
+    // 1. Ürünleri Dinle
     const unsubProducts = onSnapshot(collection(db, "products"), (snap) => {
       setProducts(
         snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -200,7 +191,7 @@ export default function MenuPanel({ onBack }) {
         const fetchedCategories = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setCategories(fetchedCategories);
         
-        // Formdaki varsayılan kategoriyi ayarla (sadece ilk yüklemede)
+        // Formdaki varsayılan kategoriyi ayarla
         setNewProduct(prev => {
             if (!prev.category && fetchedCategories.length > 0) {
                 return { ...prev, category: fetchedCategories[0].name };
@@ -218,7 +209,7 @@ export default function MenuPanel({ onBack }) {
   // Kategori listesi (ürün formunda kullanılacak)
   const uniqueCategories = useMemo(() => categories.map(c => c.name), [categories]);
 
-  // ---------------- HELPER: Eski Görseli Silme (Aynı kalır) ----------------
+  // ---------------- HELPER: Eski Görseli Silme ----------------
   const deleteOldImage = async (url) => {
       if (!url || !url.includes("firebasestorage")) return;
       try {
@@ -231,7 +222,7 @@ export default function MenuPanel({ onBack }) {
       }
   };
 
-  // ---------------- CRUD İşlemleri (Aynı kalır, category'ye bağlanacak) ----------------
+  // ---------------- CRUD İşlemleri ----------------
   const handleSave = async (e) => {
     e.preventDefault();
     if (!newProduct.name || !newProduct.price || !newProduct.category) {
@@ -239,7 +230,7 @@ export default function MenuPanel({ onBack }) {
         return;
     }
     
-    // Kategorinin varlığını kontrol et (Kullanıcı eski bir kategori seçip silmiş olabilir)
+    // Kategorinin varlığını kontrol et
     if (!uniqueCategories.includes(newProduct.category)) {
          alert(`Seçtiğiniz kategori (${newProduct.category}) artık mevcut değil. Lütfen geçerli bir kategori seçin.`);
          return;
@@ -257,9 +248,14 @@ export default function MenuPanel({ onBack }) {
         oldImageUrl = docSnap.data()?.imageUrl;
       }
 
-      // 2. YENİ DOSYA YÜKLE (Aynı kalır)
+      // 2. YENİ DOSYA YÜKLE
       if (file) {
         const filePath = `products/${newProduct.name}_${Date.now()}_${file.name}`;
+        // Not: Orijinal kodunuzda özel bir uploadUrl kullanılmış. 
+        // Firebase SDK'nın standart uploadBytes'ını kullanmak genellikle daha basittir
+        // ancak orijinal mantığı korumak için fetch'li yapıyı varsayıyoruz.
+        // Eğer firebase.js'den 'uploadBytes' import edildiyse, o kullanılmalıdır.
+        // Burada orijinal koddaki fetch'i temel alıyoruz:
         const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/restaurant-app-c4414/o?uploadType=media&name=${encodeURIComponent(filePath)}`;
 
         const response = await fetch(uploadUrl, {
@@ -278,6 +274,7 @@ export default function MenuPanel({ onBack }) {
             await deleteOldImage(oldImageUrl);
         }
       } 
+      
       // 3. YÜKLEME VEYA GÜNCELLEME İŞLEMİ
       const productData = {
         name: newProduct.name,
@@ -343,32 +340,28 @@ export default function MenuPanel({ onBack }) {
   
   // ---------------- Render ----------------
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex justify-between items-center mb-6 border-b pb-2">
-        <h2 className="text-3xl font-bold">🍔 Menü Yönetim Paneli</h2>
+    <div className="admin-subpanel-container">
+      <div className="subpanel-header">
+        <h2 className="subpanel-title">🍔 Menü Yönetim Paneli</h2>
         <button
           onClick={onBack}
-          className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
+          className="button button-secondary"
         >
           ← Ana Panele Dön
         </button>
       </div>
       
       {/* 🚀 YENİ: Sekme Navigasyonu */}
-      <div className="flex border-b border-gray-300 mb-6">
+      <div className="tab-nav">
         <button
           onClick={() => setActiveTab("products")}
-          className={`px-4 py-2 font-semibold ${
-            activeTab === "products" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"
-          }`}
+          className={`tab-button ${activeTab === "products" ? "active" : ""}`}
         >
           Ürünler
         </button>
         <button
           onClick={() => setActiveTab("categories")}
-          className={`px-4 py-2 font-semibold ${
-            activeTab === "categories" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"
-          }`}
+          className={`tab-button ${activeTab === "categories" ? "active" : ""}`}
         >
           Kategoriler ({categories.length})
         </button>
@@ -378,18 +371,18 @@ export default function MenuPanel({ onBack }) {
       {activeTab === "products" && (
         <>
           {/* Ürün Ekle/Düzenle Formu */}
-          <div className="border p-4 rounded-lg shadow mb-8 bg-gray-50">
-            <h3 className="text-xl font-semibold mb-4">
+          <div className="form-container product-form-container">
+            <h3 className="form-title">
               {editingId ? "✏️ Ürün Düzenle" : "➕ Yeni Ürün Ekle"}
             </h3>
-            <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <form onSubmit={handleSave} className="product-form">
               {/* İsim ve Fiyat */}
               <input
                 type="text"
                 placeholder="Ürün Adı"
                 value={newProduct.name}
                 onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                className="border p-2 rounded"
+                className="form-input"
                 disabled={uploading}
               />
               <input
@@ -397,14 +390,14 @@ export default function MenuPanel({ onBack }) {
                 placeholder="Fiyat (₺)"
                 value={newProduct.price}
                 onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-                className="border p-2 rounded"
+                className="form-input"
                 disabled={uploading}
               />
               {/* 🚀 DİNAMİK KATEGORİ LİSTESİ */}
               <select
                 value={newProduct.category}
                 onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                className="border p-2 rounded bg-white"
+                className="form-select"
                 disabled={uploading || categories.length === 0}
               >
                 {categories.length === 0 ? (
@@ -416,25 +409,24 @@ export default function MenuPanel({ onBack }) {
                 )}
               </select>
               
-              {/* GÖRSEL YÜKLEME ALANI (Aynı kalır) */}
-              <div className="md:col-span-2 border p-2 rounded bg-white flex items-center gap-3">
-                <label className="text-gray-600 text-sm flex-shrink-0">Görsel Yükle:</label>
+              {/* GÖRSEL YÜKLEME ALANI */}
+              <div className="form-input-file-wrapper">
+                <label className="form-label-inline">Görsel Yükle:</label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={(e) => setFile(e.target.files[0])}
-                  className="flex-1"
                   disabled={uploading}
                 />
               </div>
               
-              {/* YÜKLEME BUTONU/DURUMU (Aynı kalır) */}
-              <div className="flex gap-2">
+              {/* YÜKLEME BUTONU/DURUMU */}
+              <div className="form-actions">
                 <button
                   type="submit"
-                  className={`w-full text-white py-2 rounded font-semibold transition ${
-                    editingId ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700"
-                  } ${uploading || !newProduct.name ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`button ${
+                    editingId ? "button-blue" : "button-green"
+                  }`}
                   disabled={uploading || !newProduct.name || categories.length === 0}
                 >
                   {uploading ? 'Yükleniyor...' : editingId ? "Kaydet" : "Ekle"}
@@ -447,7 +439,7 @@ export default function MenuPanel({ onBack }) {
                       setNewProduct({ name: "", price: "", category: uniqueCategories[0] || "", imageUrl: "" });
                       setFile(null);
                     }}
-                    className="bg-gray-400 text-white py-2 px-3 rounded hover:bg-gray-500"
+                    className="button button-secondary"
                     disabled={uploading}
                   >
                     İptal
@@ -455,45 +447,45 @@ export default function MenuPanel({ onBack }) {
                 )}
               </div>
 
-              {/* Mevcut görseli göster (Aynı kalır) */}
+              {/* Mevcut görseli göster */}
               {editingId && newProduct.imageUrl && (
-                <div className="md:col-span-3 mt-2">
-                  <p className="text-sm text-gray-600 mb-1">Mevcut Görsel:</p>
-                  <img src={newProduct.imageUrl} alt="Mevcut" className="w-20 h-20 object-cover rounded shadow" />
+                <div className="image-preview-wrapper">
+                  <p className="image-preview-label">Mevcut Görsel:</p>
+                  <img src={newProduct.imageUrl} alt="Mevcut" className="image-preview" />
                 </div>
               )}
               
             </form>
           </div>
 
-          {/* Ürün Listesi (Aynı kalır) */}
-          <h3 className="text-xl font-semibold mb-3">Tüm Menü Ürünleri</h3>
-          <div className="space-y-3">
+          {/* Ürün Listesi */}
+          <h3 className="section-title">Tüm Menü Ürünleri</h3>
+          <div className="product-list">
             {products.map((p) => (
               <div
                 key={p.id}
-                className="flex justify-between items-center p-3 bg-white border rounded shadow-sm"
+                className="product-list-item"
               >
-                <div className="flex items-center gap-3">
-                    {p.imageUrl && <img src={p.imageUrl} alt={p.name} className="w-10 h-10 object-cover rounded" />}
+                <div className="product-info">
+                    {p.imageUrl && <img src={p.imageUrl} alt={p.name} className="product-item-image" />}
                     <div>
-                        <span className="font-semibold">{p.name}</span>
-                        <span className="text-sm text-gray-500 block">
+                        <span className="product-item-name">{p.name}</span>
+                        <span className="product-item-details">
                             {p.category} | {p.price} ₺
                         </span>
                     </div>
                 </div>
                 
-                <div className="flex gap-2 text-sm">
+                <div className="product-actions">
                   <button
                     onClick={() => handleEdit(p)}
-                    className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
+                    className="button button-yellow-outline"
                   >
                     Düzenle
                   </button>
                   <button
                     onClick={() => handleDelete(p.id, p.name, p.imageUrl)}
-                    className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                    className="button button-danger-outline"
                   >
                     Sil
                   </button>
@@ -502,7 +494,7 @@ export default function MenuPanel({ onBack }) {
             ))}
           </div>
           {!products.length && (
-              <p className="text-gray-500 text-center mt-5">Henüz menüye ürün eklenmemiş.</p>
+              <p className="empty-text">Henüz menüye ürün eklenmemiş.</p>
           )}
         </>
       )}

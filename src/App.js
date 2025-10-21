@@ -1,3 +1,4 @@
+// src/App.js
 import { Routes, Route, Navigate } from "react-router-dom";
 import Menu from "./pages/Menu";
 import Kitchen from "./pages/Kitchen";
@@ -5,6 +6,7 @@ import Waiter from "./pages/Waiter";
 import Login from "./pages/Login";
 import { CartProvider } from "./context/CartContext";
 import AdminDashboard from "./pages/AdminDashboard";
+import './App.css'; // 👈 GLOBAL STİLLERİ İÇE AKTAR
 
 // 🔹 Rol tabanlı koruma
 function PrivateRoute({ children, allowedRole }) {

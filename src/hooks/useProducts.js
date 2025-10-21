@@ -1,17 +1,10 @@
 // src/hooks/useProducts.js
-
 import { useState, useEffect, useMemo } from "react";
 import { collection, getDocs, query } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 /**
  * 🔹 Firebase'den ürünleri çeken, gruplayan ve yöneten Hook.
- * @returns {{
- * products: Object, // { KategoriAdi: [urun1, urun2], ... }
- * allProducts: Array, // Tüm ürünlerin düz listesi
- * categories: Array, // Sadece kategori isimleri
- * loading: boolean, // Yükleme durumu
- * }}
  */
 export default function useProducts() {
   const [products, setProducts] = useState({}); // Kategoriye göre gruplandırılmış

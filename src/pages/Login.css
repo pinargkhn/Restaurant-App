@@ -1,0 +1,37 @@
+/* src/pages/Login.css */
+.login-container {
+  max-width: 400px;
+  /* MOBİL UYUMLULUK: Mobilde üst boşluğu azalt */
+  margin: 2rem auto;
+  padding: 2rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--white);
+  box-shadow: var(--shadow-md);
+}
+
+/* MOBİL UYUMLULUK: Tablet ve üstü */
+@media (min-width: 768px) {
+  .login-container {
+    margin: 5rem auto;
+  }
+}
+
+.login-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-form .button {
+  margin-top: 0.5rem;
+  padding: 0.8rem;
+}

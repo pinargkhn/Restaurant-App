@@ -1,10 +1,12 @@
+// src/pages/Menu.js
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useCart } from "../context/CartContext";
 import useProducts from "../hooks/useProducts";
-import Cart from "../components/Cart"; // Cart'ın components klasöründen geldiğini varsayıyoruz
+import Cart from "../components/Cart";
+import './Menu.css'; // 👈 YENİ CSS İÇE AKTAR
 
 export default function Menu() {
   const { addItem } = useCart();
@@ -88,7 +90,6 @@ export default function Menu() {
     if (!validTable || searchQuery.trim() || loadingProducts) return;
 
     // Sticky nav'ın (Arama Çubuğu + Kategori Navigasyonu) yüksekliğini telafi eden margin.
-    // Başlık viewport'un -150px altındayken bile görünmüş kabul edilir.
     const options = {
       root: null, 
       rootMargin: "-150px 0px 0px 0px", 
@@ -134,7 +135,7 @@ export default function Menu() {
 
   if (loading || loadingProducts) {
     return (
-      <div className="flex items-center justify-center h-screen text-lg font-semibold text-gray-600">
+      <div className="menu-loading-screen">
         Menü verileri yükleniyor...
       </div>
     );
@@ -142,7 +143,7 @@ export default function Menu() {
 
   if (!validTable) {
     return (
-      <div className="flex items-center justify-center h-screen text-lg text-red-600 font-semibold">
+      <div className="menu-loading-screen error">
         Geçersiz masa bağlantısı!
       </div>
     );
@@ -152,101 +153,106 @@ export default function Menu() {
 
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen">
-      <div className="flex-1 p-6 max-w-full md:max-w-2xl mx-auto md:mx-0 overflow-x-hidden"> {/* ✅ YATAY SCROLL ÖNLENDİ */}
-        <h2 className="text-2xl font-bold mb-4 text-center border-b pb-2">
-          Dijital Menü ({tableId})
+    <div className="menu-container">
+      <main className="menu-content">
+        
+        <h2 className="menu-page-title">
+          Dijital Menü (Masa: {tableId})
         </h2>
         
-        {/* ARAMA ÇUBUĞU (Sticky top:0) */}
-        <div className="mb-6 sticky top-0 bg-white z-20 p-2 -mx-2 shadow-sm">
-            <input
-                type="text"
-                placeholder="Yemek ara..."
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
+        {/* Sticky Header (Arama + Kategori Navigasyonu) */}
+        <div className="sticky-header">
+            
+            {/* Kategori Navigasyonu (Kırmızı bar) */}
+            {!searchQuery.trim() && (
+                <nav className="category-nav">
+                    {CATEGORIES.map((category) => (
+                        <button
+                        key={category}
+                        onClick={() => {
+                            scrollToCategory(category);
+                            setActiveCategory(category); // ✅ TIKLAMADA VURGULAMAYI ANINDA GÜNCELLE
+                        }} 
+                        className={`category-nav-button ${
+                            activeCategory === category ? 'active' : ''
+                        }`}
+                        >
+                        {category.toUpperCase()}
+                        </button>
+                    ))}
+                </nav>
+            )}
+
+            {/* Arama Çubuğu */}
+            <div className="search-bar-wrapper">
+                <input
+                    type="text"
+                    placeholder="Menüde Ara..."
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    className="search-input"
+                />
+            </div>
         </div>
 
 
-        {/* Sabit Kategori Navigasyonu (Sticky) */}
-        {!searchQuery.trim() && (
-            <div className="flex justify-start overflow-x-auto border-b border-gray-300 mb-6 sticky top-[75px] bg-white z-20 shadow-md p-2 -mx-2 whitespace-nowrap">
-                {CATEGORIES.map((category) => (
-                    <button
-                    key={category}
-                    onClick={() => {
-                        scrollToCategory(category);
-                        setActiveCategory(category); // ✅ TIKLAMADA VURGULAMAYI ANINDA GÜNCELLE
+        {/* Ürün Listeleme Alanı */}
+        <div className="product-list-area">
+            {categoriesToRender.length > 0 ? (
+            categoriesToRender.map((category) => (
+                <section key={category} className="category-section">
+                
+                {/* Başlık - Scrolling ve Intersection için reference noktası */}
+                <h3
+                    ref={!searchQuery.trim() ? (el) => (categoryRefs.current[category] = el) : null}
+                    data-category={category} 
+                    className="category-title-banner"
+                    // ✅ CSS Hilesi: Yapışkan nav'ın içeriği kapatmasını engellemek için 150px offset
+                    style={{ 
+                        marginTop: searchQuery.trim() ? '0' : '-150px', 
+                        paddingTop: searchQuery.trim() ? '0' : '150px' 
                     }} 
-                    className={`px-4 py-2 font-semibold transition-colors ${
-                        activeCategory === category
-                        ? "border-b-2 border-blue-600 text-blue-600" // ✅ AKTİF VURGULAMA
-                        : "text-gray-600 hover:text-blue-500"
-                    }`}
-                    >
+                >
                     {category}
-                    </button>
-                ))}
-            </div>
-        )}
+                </h3>
 
-        {/* TÜM KATEGORİLERİ DÖNGÜYLE GÖSTER */}
-        {categoriesToRender.length > 0 ? (
-          categoriesToRender.map((category) => (
-            <div key={category} className="mb-8">
-              {/* Başlık - Scrolling ve Intersection için reference noktası */}
-              <h3
-                ref={!searchQuery.trim() ? (el) => (categoryRefs.current[category] = el) : null}
-                data-category={category} 
-                className="text-xl font-bold mb-4 border-l-4 border-blue-600 pl-3 pt-2"
-                // ✅ CSS Hilesi: Yapışkan nav'ın içeriği kapatmasını engellemek için 150px offset
-                style={{ 
-                    marginTop: searchQuery.trim() ? '0' : '-150px', 
-                    paddingTop: searchQuery.trim() ? '0' : '150px' 
-                }} 
-              >
-                {category}
-              </h3>
-
-              <ul className="space-y-3">
-                {(searchQuery.trim() ? filteredMenu[category] : products[category]).map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex justify-between items-center p-4 bg-white rounded shadow hover:shadow-lg transition-shadow"
-                  >
-                    <div className="flex items-center gap-4">
+                <ul className="product-items-grid">
+                    {(searchQuery.trim() ? filteredMenu[category] : products[category]).map((item) => (
+                    <li
+                        key={item.id}
+                        className="product-card"
+                    >
                        {item.imageUrl && ( 
                             <img 
                                 src={item.imageUrl} 
                                 alt={item.name} 
-                                className="w-16 h-16 object-cover rounded-md" 
+                                className="product-image" 
                             />
                        )}
-                       <div className="flex flex-col">
-                            <span className="font-semibold text-lg">{item.name}</span>
-                            <span className="text-gray-600 text-base">
+
+                       <div className="product-details">
+                            <span className="product-name">{item.name}</span>
+                            <span className="product-price">
                             {item.price} ₺
                             </span>
                        </div>
-                    </div>
-                    
-                    <button
-                      className="px-4 py-2 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 transition"
-                      onClick={() => addItem(item)}
-                    >
-                      + Ekle
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))
-        ) : (
-             <p className="text-center text-gray-500 mt-10">Aradığınız ürün bulunamadı.</p>
-        )}
-      </div>
+                        
+                        <button
+                            className="add-to-cart-button"
+                            onClick={() => addItem(item)}
+                        >
+                            + EKLE
+                        </button>
+                    </li>
+                    ))}
+                </ul>
+                </section>
+            ))
+            ) : (
+                 <p className="empty-text">Aradığınız ürün bulunamadı.</p>
+            )}
+        </div>
+      </main>
 
       {/* Sağ kısım: Sepet (Cart.js) */}
       <Cart />

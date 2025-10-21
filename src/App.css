@@ -1,38 +1,321 @@
-.App {
+/* src/App.css */
+
+/* ---------------------------------------------------------- */
+/* 1. KÖK DEĞİŞKENLER (Kırmızı Tema)
+/* ---------------------------------------------------------- */
+:root {
+  /* Renkler */
+  --primary-red: #D90429;
+  --primary-red-dark: #A60321;
+  --primary-blue: #0d6efd;
+  --primary-green: #198754;
+  --primary-yellow: #ffc107;
+  --primary-pink: #d63384;
+  --primary-purple: #6f42c1;
+  --primary-indigo: #6610f2;
+  
+  --danger-red: #dc3545;
+  --danger-red-light: #f8d7da;
+  
+  /* Nötr Renkler */
+  --text-dark: #212529;
+  --text-light: #6c757d;
+  --background-light: #f8f9fa;
+  --white: #ffffff;
+  --border-color: #dee2e6;
+  --border-color-light: #f1f1f1;
+
+  /* Gölgeler */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  /* Geçişler */
+  --transition: all 0.2s ease-in-out;
+}
+
+/* ---------------------------------------------------------- */
+/* 2. TEMEL SIFIRLAMA ve GENEL STİLLER
+/* ---------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  margin: 0;
+  background-color: var(--background-light);
+  color: var(--text-dark);
+  /* MOBİL UYUMLULUK: Metnin taşmasını engelle */
+  overflow-x: hidden;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------- */
+/* 3. TEKRAR KULLANILABİLİR BİLEŞENLER
+/* ---------------------------------------------------------- */
+
+/* === Butonlar === */
+.button {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-weight: 600;
   text-align: center;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+/* ... (Tüm .button-xxx stilleri aynı kalır) ... */
+.button-primary { background-color: var(--primary-red); color: var(--white); }
+.button-primary:hover { background-color: var(--primary-red-dark); }
+.button-secondary { background-color: var(--text-light); color: var(--white); }
+.button-secondary:hover { opacity: 0.8; }
+.button-danger { background-color: var(--danger-red); color: var(--white); }
+.button-danger:hover { opacity: 0.8; }
+.button-green { background-color: var(--primary-green); color: var(--white); }
+.button-green:hover { opacity: 0.8; }
+.button-blue { background-color: var(--primary-blue); color: var(--white); }
+.button-blue:hover { opacity: 0.8; }
+.button-yellow { background-color: var(--primary-yellow); color: var(--text-dark); }
+.button-yellow:hover { opacity: 0.8; }
+.button-danger-outline { background-color: transparent; color: var(--danger-red); border-color: var(--danger-red); }
+.button-danger-outline:hover { background-color: var(--danger-red); color: var(--white); }
+.button-blue-outline { background-color: transparent; color: var(--primary-blue); border-color: var(--primary-blue); }
+.button-blue-outline:hover { background-color: var(--primary-blue); color: var(--white); }
+.button-yellow-outline { background-color: transparent; color: var(--primary-yellow); border-color: var(--primary-yellow); }
+.button-yellow-outline:hover { background-color: var(--primary-yellow); color: var(--text-dark); }
+.button-icon { padding: 0.4rem 0.6rem; background-color: #e9ecef; color: var(--text-dark); }
+.button-icon:hover { background-color: #ced4da; }
+
+/* === Form Elemanları === */
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--white);
+}
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--primary-red);
+  box-shadow: 0 0 0 3px rgba(217, 4, 41, 0.2);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
+.form-textarea { resize: vertical; min-height: 80px; }
+.form-label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
+.form-error { color: var(--danger-red); margin-top: 1rem; text-align: center; }
+
+/* === Genel Paneller === */
+.admin-subpanel-container {
+  /* MOBİL UYUMLULUK: Mobilde daha az padding ve margin */
+  padding: 1rem;
+  margin: 1rem;
+  background-color: var(--white);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+}
+
+/* MOBİL UYUMLULUK: Tablet ve üstü */
+@media (min-width: 768px) {
+  .admin-subpanel-container {
+    padding: 1.5rem;
+    max-width: 1140px;
+    margin: 1rem auto;
   }
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.subpanel-header {
+  display: flex;
+  /* MOBİL UYUMLULUK: Başlık ve butonları alt alta diz */
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+/* MOBİL UYUMLULUK: Butonların tam genişlik almasını sağla */
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+.header-actions .button {
+  flex: 1; /* Butonların eşit genişlemesi için */
+}
+
+/* MOBİL UYUMLULUK: Tablet ve üstü */
+@media (min-width: 768px) {
+  .subpanel-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header-actions {
+    width: auto;
+  }
+  .header-actions .button {
+    flex: 0 1 auto; /* Geri al */
+  }
+}
+
+
+.subpanel-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: var(--text-dark);
+}
+
+.panel-note {
+  font-size: 0.9rem;
+  background-color: #fff3cd;
+  border: 1px solid #ffe69c;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.empty-text {
+  color: var(--text-light);
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.1rem;
+}
+
+/* === Modallar === */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background-color: var(--white);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.modal-form {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  gap: 1rem;
 }
 
-.App-link {
-  color: #61dafb;
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border-color-light);
+  padding-top: 1.5rem;
+}
+.modal-actions > .button {
+  flex: 1;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* === Sekmeler (Tabs) === */
+.tab-nav {
+  display: flex;
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 1.5rem;
+  /* MOBİL UYUMLULUK: Yatay kaydırma */
+  overflow-x: auto;
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.tab-nav::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.tab-button {
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  color: var(--text-light);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  transform: translateY(2px);
+  transition: var(--transition);
+  /* MOBİL UYUMLULUK: Sekmelerin küçülmesini engelle */
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.tab-button:hover {
+  color: var(--text-dark);
+}
+
+.tab-button.active {
+  color: var(--primary-red);
+  border-bottom-color: var(--primary-red);
+}
+
+/* === Veri Tablosu (Data Table) === */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border-color);
+  font-size: 0.9rem;
+}
+.data-table th,
+.data-table td {
+  border: 1px solid var(--border-color);
+  padding: 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+.data-table th {
+  background-color: var(--background-light);
+  font-weight: 600;
+}
+.data-table tr:hover {
+  background-color: #fcfcfc;
 }

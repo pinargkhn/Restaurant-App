@@ -1,5 +1,4 @@
 // src/pages/UserPanel.js
-
 import { useState, useEffect } from "react";
 import { 
   db, 
@@ -8,11 +7,10 @@ import {
   doc, 
   setDoc, 
   deleteDoc,
-  // 🚀 DÜZELTME: getAuth yerine auth import edildi
   auth,
 } from "../lib/firebase"; 
-// 🚀 Firebase Auth fonksiyonları (Aynı Kalır)
 import { createUserWithEmailAndPassword } from "firebase/auth";
+import './UserPanel.css'; // 👈 YENİ CSS İÇE AKTAR
 
 const ROLES = ["admin", "waiter", "kitchen", "none"]; // none = yetkisiz
 
@@ -20,14 +18,13 @@ export default function UserPanel({ onBack }) {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     
-    // 🚀 YENİ STATE'LER (Aynı Kalır)
     const [showAddModal, setShowAddModal] = useState(false);
     const [newEmail, setNewEmail] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [newRole, setNewRole] = useState("waiter");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // ---------------- Firestore Dinleme (Aynı Kalır) ----------------
+    // ---------------- Firestore Dinleme ----------------
     useEffect(() => {
         const unsub = onSnapshot(collection(db, "users"), (snap) => {
             setUsers(
@@ -43,7 +40,7 @@ export default function UserPanel({ onBack }) {
         return () => unsub();
     }, []);
 
-    // ---------------- Rol Güncelleme (Aynı Kalır) ----------------
+    // ---------------- Rol Güncelleme ----------------
     const handleRoleChange = async (userId, newRole) => {
         try {
             const userRef = doc(db, "users", userId);
@@ -55,7 +52,7 @@ export default function UserPanel({ onBack }) {
         }
     };
     
-    // ---------------- Kullanıcı Silme (Aynı Kalır) ----------------
+    // ---------------- Kullanıcı Silme ----------------
     const handleDeleteUser = async (userId, userEmail) => {
         if (window.confirm(`${userEmail} kullanıcısını silmek istediğinizden emin misiniz? Firestore kaydı silinecek.`)) {
             try {
@@ -69,7 +66,7 @@ export default function UserPanel({ onBack }) {
         }
     };
     
-    // 🚀 YENİ FONKSİYON: Yeni kullanıcıyı oluşturma
+    // ---------------- Yeni kullanıcıyı oluşturma ----------------
     const handleCreateUser = async (e) => {
         e.preventDefault();
         if (!newEmail || newPassword.length < 6) {
@@ -79,8 +76,6 @@ export default function UserPanel({ onBack }) {
 
         setIsSubmitting(true);
         try {
-            // 🚀 DÜZELTME: getAuth() yerine içeri aktarılan auth objesi kullanıldı.
-            
             // 1. Firebase Authentication ile kullanıcı oluştur
             const userCredential = await createUserWithEmailAndPassword(auth, newEmail, newPassword);
             const user = userCredential.user;
@@ -109,53 +104,53 @@ export default function UserPanel({ onBack }) {
         }
     };
     
-    if (loading) return <div className="p-6 max-w-4xl mx-auto">Kullanıcılar yükleniyor...</div>;
+    if (loading) return <div className="admin-subpanel-container">Kullanıcılar yükleniyor...</div>;
 
-    // ---------------- Render ---------------- (Aynı Kalır)
+    // ---------------- Render ----------------
     return (
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="admin-subpanel-container">
             {/* BAŞLIK VE BUTONLAR */}
-            <div className="flex justify-between items-center mb-6 border-b pb-2">
-                <h2 className="text-3xl font-bold">👤 Kullanıcı Yönetim Paneli</h2>
-                <div className="flex gap-2"> 
+            <div className="subpanel-header">
+                <h2 className="subpanel-title">👤 Kullanıcı Yönetim Paneli</h2>
+                <div className="header-actions"> 
                     <button
                         onClick={() => setShowAddModal(true)} 
-                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+                        className="button button-green"
                     >
                         ➕ Yeni Kullanıcı Ekle
                     </button>
                     <button
                         onClick={onBack}
-                        className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
+                        className="button button-secondary"
                     >
                         ← Ana Panele Dön
                     </button>
                 </div>
             </div>
             
-            <p className="mb-4 text-gray-600">
+            <p className="panel-note">
                 ⚠️ **Not:** Yeni kullanıcı eklemek, Firebase Authentication'da bir hesap oluşturur ve ardından Firestore'daki rol kaydını atar.
             </p>
 
             {/* KULLANICI LİSTESİ */}
-            <div className="space-y-3">
+            <div className="user-list">
                 {users.map((user) => (
                     <div
                         key={user.id}
-                        className="flex justify-between items-center p-3 bg-white border rounded shadow-sm"
+                        className="user-list-item"
                     >
-                        <div>
-                            <span className="font-semibold">{user.email || user.id}</span>
-                            <span className="text-sm text-gray-500 block">
+                        <div className="user-info">
+                            <span className="user-email">{user.email || user.id}</span>
+                            <span className="user-role">
                                 Rol: {user.role || "none"}
                             </span>
                         </div>
                         
-                        <div className="flex gap-2 items-center text-sm">
+                        <div className="user-actions">
                             <select
                                 value={user.role || 'none'}
                                 onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                                className="border p-1 rounded bg-white text-gray-800"
+                                className="form-select"
                             >
                                 {ROLES.map(role => (
                                     <option key={role} value={role}>{role.toUpperCase()}</option>
@@ -164,7 +159,7 @@ export default function UserPanel({ onBack }) {
 
                             <button
                                 onClick={() => handleDeleteUser(user.id, user.email || user.id)}
-                                className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                                className="button button-danger"
                             >
                                 Sil
                             </button>
@@ -174,21 +169,21 @@ export default function UserPanel({ onBack }) {
             </div>
 
             {!users.length && (
-                <p className="text-gray-500 text-center mt-5">Kayıtlı kullanıcı rolü bulunmamaktadır.</p>
+                <p className="empty-text">Kayıtlı kullanıcı rolü bulunmamaktadır.</p>
             )}
             
             {/* YENİ KULLANICI EKLEME MODALI */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-                    <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
-                        <h3 className="text-xl font-bold mb-4">Yeni Kullanıcı Oluştur</h3>
-                        <form onSubmit={handleCreateUser} className="space-y-3">
+                <div className="modal-overlay">
+                    <div className="modal-content modal-add-user">
+                        <h3 className="modal-title">Yeni Kullanıcı Oluştur</h3>
+                        <form onSubmit={handleCreateUser} className="modal-form">
                             <input
                                 type="email"
                                 placeholder="E-posta"
                                 value={newEmail}
                                 onChange={(e) => setNewEmail(e.target.value)}
-                                className="border p-2 rounded w-full"
+                                className="form-input"
                                 required
                                 disabled={isSubmitting}
                             />
@@ -197,7 +192,7 @@ export default function UserPanel({ onBack }) {
                                 placeholder="Şifre (Min 6 karakter)"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
-                                className="border p-2 rounded w-full"
+                                className="form-input"
                                 required
                                 minLength={6}
                                 disabled={isSubmitting}
@@ -205,7 +200,7 @@ export default function UserPanel({ onBack }) {
                             <select
                                 value={newRole}
                                 onChange={(e) => setNewRole(e.target.value)}
-                                className="border p-2 rounded w-full bg-white"
+                                className="form-select"
                                 disabled={isSubmitting}
                             >
                                 {ROLES.filter(r => r !== 'none').map(role => (
@@ -213,18 +208,18 @@ export default function UserPanel({ onBack }) {
                                 ))}
                             </select>
                             
-                            <div className="flex gap-3 pt-2">
+                            <div className="modal-actions">
                                 <button
                                     type="button"
                                     onClick={() => setShowAddModal(false)}
-                                    className="bg-gray-500 text-white px-4 py-2 rounded flex-1 hover:bg-gray-600"
+                                    className="button button-secondary"
                                     disabled={isSubmitting}
                                 >
                                     İptal
                                 </button>
                                 <button
                                     type="submit"
-                                    className="bg-green-600 text-white px-4 py-2 rounded flex-1 hover:bg-green-700 disabled:bg-gray-400"
+                                    className="button button-green"
                                     disabled={isSubmitting || !newEmail || newPassword.length < 6}
                                 >
                                     {isSubmitting ? 'Oluşturuluyor...' : 'Kullanıcıyı Oluştur'}

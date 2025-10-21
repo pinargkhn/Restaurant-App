@@ -1,5 +1,4 @@
 // src/lib/firebase.js
-
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
@@ -19,7 +18,6 @@ import {
   where,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-// 🚀 YENİ İMPORTLAR: Firebase Storage
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"; 
 
 // 🔐 .env dosyandaki Firebase bilgilerini kullan
@@ -36,7 +34,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app); 
-// 🚀 YENİ: Storage'ı başlat
 const storage = getStorage(app, "gs://restaurant-app-c4414");
 
 export {
@@ -56,7 +53,6 @@ export {
   query,
   orderBy,
   where,
-  // 🚀 YENİ EXPORTLAR: Storage
   storage,
   ref,
   uploadBytes,

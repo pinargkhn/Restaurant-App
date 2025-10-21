@@ -1,0 +1,196 @@
+/* src/pages/MenuPanel.css */
+
+.form-container {
+  background-color: var(--background-light);
+  border: 1px solid var(--border-color);
+  padding: 1rem; /* MOBİL UYUMLULUK: Mobilde daha az padding */
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+@media (min-width: 768px) {
+  .form-container {
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+}
+
+.form-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.product-form {
+  display: grid;
+  grid-template-columns: 1fr; /* MOBİL UYUMLULUK: (Mobile-First) Tek sütun */
+  gap: 1rem;
+}
+/* MOBİL UYUMLULUK: Tablet ve üstü (3 sütun) */
+@media (min-width: 768px) {
+  .product-form {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.form-input-file-wrapper {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--white);
+}
+/* MOBİL UYUMLULUK: Tablet ve üstü */
+@media (min-width: 768px) {
+  .form-input-file-wrapper {
+    grid-column: 1 / span 2;
+  }
+}
+
+.form-label-inline {
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.5rem;
+}
+/* MOBİL UYUMLULUK: Tablet ve üstü */
+@media (min-width: 768px) {
+  .form-actions {
+    grid-column: 3 / -1;
+  }
+}
+.form-actions .button {
+  flex: 1;
+}
+
+.image-preview-wrapper {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+}
+.image-preview-label {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  margin-bottom: 0.25rem;
+}
+.image-preview {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Ürün Listesi */
+.product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.product-list-item {
+  display: flex;
+  flex-direction: column; /* MOBİL UYUMLULUK: (Mobile-First) Dikey diz */
+  gap: 1rem;
+  padding: 1rem;
+  background-color: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+}
+/* MOBİL UYUMLULUK: Tablet ve üstü (Yatay diz) */
+@media (min-width: 768px) {
+  .product-list-item {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.product-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.product-item-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.product-item-name {
+  font-weight: 600;
+  display: block;
+}
+.product-item-details {
+  font-size: 0.9rem;
+  color: var(--text-light);
+}
+.product-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.product-actions .button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+
+/* Kategori Paneli */
+.category-add-form {
+  display: flex;
+  flex-direction: column; /* MOBİL UYUMLULUK: Mobilde alt alta */
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+@media (min-width: 768px) {
+  .category-add-form {
+    flex-direction: row; /* Tabletten itibaren yan yana */
+  }
+}
+
+.category-add-form .form-input {
+  flex: 1;
+}
+.panel-note-small {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  margin-bottom: 1rem;
+}
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.category-list-item {
+  display: flex;
+  flex-wrap: wrap; /* MOBİL UYUMLULUK: Butonları alta at */
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+.category-name {
+  font-weight: 500;
+}
+.category-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.category-actions .button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+}
+.category-actions .button-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
