@@ -16,9 +16,10 @@ import {
   query,
   orderBy,
   where,
+  writeBatch // 👈 YENİ: writeBatch import edildi
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"; 
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 // 🔐 .env dosyandaki Firebase bilgilerini kullan
 const firebaseConfig = {
@@ -33,12 +34,12 @@ const firebaseConfig = {
 // 🔹 Firebase başlatma
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); 
-const storage = getStorage(app, "gs://restaurant-app-c4414");
+const auth = getAuth(app);
+const storage = getStorage(app, "gs://restaurant-app-c4414" /* Sizin bucket adınız farklıysa düzeltin */); // Bucket adı eklendi
 
 export {
   db,
-  auth, 
+  auth,
   collection,
   collectionGroup,
   addDoc,
@@ -58,4 +59,5 @@ export {
   uploadBytes,
   getDownloadURL,
   deleteObject,
+  writeBatch // 👈 YENİ: writeBatch export edildi
 };
