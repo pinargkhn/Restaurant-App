@@ -11,7 +11,21 @@
   position: sticky;
   bottom: 0;
   z-index: 200;
+
+  /* --- YENİ DEĞİŞİKLİKLER --- */
+  /* MOBİL UYUMLULUK: Başlangıçta sepeti kısa tut */
+  max-height: 200px; /* Sadece başlık + toplam + butonları gösterecek yükseklik */
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
 }
+
+/* MOBİL UYUMLULUK: Sepet 'is-expanded' sınıfını aldığında */
+.cart-container.is-expanded {
+  max-height: 85vh; /* Ekranın %85'ine kadar büyü */
+  /* İçerik taşarsa, sepetin kendisi scroll edilebilir olur */
+  overflow-y: auto; 
+}
+
 
 .cart-container.cart-empty {
   text-align: center;
@@ -19,6 +33,8 @@
   box-shadow: none;
   border-top: 1px solid var(--border-color);
   padding: 3rem 1.5rem;
+  /* YENİ: Boşken yüksekliği sıfırla */
+  max-height: none; 
 }
 
 /* MOBİL UYUMLULUK: Tablet ve üstü (Yanda Sabit) */
@@ -33,6 +49,10 @@
     border-left: 1px solid var(--border-color);
     box-shadow: var(--shadow-md);
     flex-shrink: 0;
+    
+    /* YENİ: Masaüstünde her zaman açık, yükseklik sınırı yok */
+    max-height: 100vh !important; /* 'is-expanded' kuralını ezer */
+    overflow-y: auto; /* Yüksekliği aşarsa scroll bar */
   }
   .cart-container.cart-empty {
     justify-content: center;
@@ -53,30 +73,77 @@
   margin-top: 0.5rem;
 }
 
-.cart-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-top: 0;
+/* --- YENİ STİLLER (Başlık ve Aç/Kapat Butonu) --- */
+.cart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1rem;
 }
 
+.cart-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.cart-toggle {
+  background: none;
+  border: none;
+  color: var(--primary-red);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  text-align: right;
+}
+.cart-toggle span {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  font-weight: 400;
+}
+
+/* Masaüstünde A/K butonunu gizle */
+@media (min-width: 768px) {
+  .cart-toggle {
+    display: none;
+  }
+}
+/* --- YENİ STİLLER BİTİŞ --- */
+
+
+/* --- YENİ KATLANABİLİR ALAN --- */
+.cart-collapsible-area {
+  /* Mobilde bu alanın yüksekliği .cart-container tarafından kontrol edilir */
+}
+
+/* Masaüstünde, bu alanın kendi scroll bar'ı olmalı */
+@media (min-width: 768px) {
+  .cart-collapsible-area {
+    flex: 1; /* Esne, alanı doldur */
+    overflow-y: auto; /* Taşarsa scroll et */
+    margin: 0 -0.5rem;
+    padding: 0 0.5rem;
+  }
+}
+/* --- YENİ KATLANABİLİR ALAN BİTİŞ --- */
+
+
 .cart-items-list {
-  flex: 1;
-  overflow-y: auto;
-  margin: 0 -0.5rem;
-  padding: 0 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  /* MOBİL UYUMLULUK: Mobilde kaydırma yüksekliği */
-  max-height: 200px;
+  
+  /* MOBİL UYUMLULUK: max-height kaldırıldı */
+  /* Artık tüm .cart-container scroll olacak */
 }
 
-/* MOBİL UYUMLULUK: Tablet ve üstü */
+/* Masaüstünde scroll bar'ı .cart-collapsible-area'ya verdiğimiz için */
+/* .cart-items-list'e artık gerek yok */
 @media (min-width: 768px) {
   .cart-items-list {
-    /* Masaüstünde dikey scroll için */
-    max-height: calc(100vh - 350px); /* Yüksekliği ayarla (Not+Toplam+Butonlar) */
+     /* max-height: calc(100vh - 350px); (Artık gereksiz) */
   }
 }
 
@@ -147,6 +214,9 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  
+  /* YENİ: Masaüstünde footer'ın esnemesini engelle */
+  flex-shrink: 0;
 }
 
 .cart-total {
