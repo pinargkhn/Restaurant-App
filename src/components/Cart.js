@@ -4,7 +4,7 @@ import { useCart } from "../context/CartContext";
 import './Cart.css';
 
 export default function Cart() {
-  const { cart, tableId, updateItemQty, clearCart, placeOrder, updateNote } = useCart();
+  const { cart, tableId, updateItemQty, clearCart, placeOrder, updateNote, isProcessingAction} = useCart();
   const { items, total, note } = cart;
   const [isExpanded, setIsExpanded] = useState(false);
 
