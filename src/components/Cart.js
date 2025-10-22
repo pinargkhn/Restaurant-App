@@ -68,10 +68,8 @@ export default function Cart() {
           {/* 👈 GÜNCELLEME: displayTotal kullanıldı */}
           <span>{displayTotal.toFixed(2)} ₺</span>
         </div>
-        <button onClick={placeOrder} className="button button-primary" disabled={items.length === 0}>
-          Siparişi Onayla ve Gönder
-        </button>
-        <button onClick={clearCart} className="button button-danger-outline" disabled={items.length === 0}>
+        <button onClick={placeOrder} className="button button-primary" disabled={items.length === 0 || isProcessingAction}></button> // disabled eklendi
+        <button onClick={clearCart} className="button button-danger-outline" disabled={items.length === 0 || isProcessingAction}>
           Sepeti Temizle
         </button>
       </div>
