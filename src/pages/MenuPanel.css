@@ -6,6 +6,8 @@
   padding: 1rem;
   border-radius: 8px;
   margin-bottom: 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 @media (min-width: 768px) {
   .form-container { padding: 1.5rem; margin-bottom: 2rem; }
@@ -18,13 +20,20 @@
   margin-bottom: 1.5rem;
 }
 
+/* ----- .product-form GÜNCELLENDİ ----- */
 .product-form {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
+  display: flex; /* Grid yerine flex */
+  flex-wrap: wrap; /* Elemanlar sığmazsa alt satıra geçsin */
+  gap: 1rem; /* Elemanlar arası boşluk */
+  width: 100%; /* Genişlik ayarı hala geçerli olabilir */
+  box-sizing: border-box; /* Padding varsa taşmayı önler */
 }
-@media (min-width: 768px) { .product-form { grid-template-columns: repeat(3, 1fr); } }
-
+/* ----- .product-form Bitiş ----- */
+@media (min-width: 768px) {
+  .product-form {
+    grid-template-columns: repeat(3, 1fr); /* Tabletten itibaren 3 sütun */
+  }
+}
 .form-input-file-wrapper {
   grid-column: 1 / -1;
   display: flex;
@@ -34,11 +43,12 @@
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background-color: var(--white);
+  width: 100%;
 }
 @media (min-width: 768px) { .form-input-file-wrapper { grid-column: 1 / span 2; } }
 
 .form-label-inline { font-weight: 500; flex-shrink: 0; }
-.form-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; }
+.form-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; width: 100%;}
 @media (min-width: 768px) { .form-actions { grid-column: 3 / -1; } }
 .form-actions .button { flex: 1; }
 
