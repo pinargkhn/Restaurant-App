@@ -1,5 +1,5 @@
 // src/context/CartContext.js
-import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from "react"; // useRef eklendi
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { db } from "../lib/firebase";
 import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
@@ -53,15 +53,14 @@ export function CartProvider({ children }) {
       console.log("Firestore data:", firestoreCartData);
 
       setCart(currentLocalCart => {
-        console.log("Current local cart:", currentLocalCart);
+        // console.log("Current local cart:", currentLocalCart);
         // Firestore'dan gelen veri ile mevcut yerel state'i TAMAMEN karşılaştır
         if (areCartsEqual(firestoreCartData, currentLocalCart)) {
-          console.log("Firestore data matches local state exactly. No update needed.");
-          return currentLocalCart; // Veri aynıysa, state'i değiştirme (gereksiz render önle)
+          // console.log("Firestore data matches local state exactly. No update needed.");
+          return currentLocalCart; // Veri aynıysa, state'i değiştirme
         } else {
           console.log("Firestore data differs. Updating local state from Firestore.");
           // Veri farklıysa, Firestore'dan gelen veriyi kullan
-          // Bu, başka bir cihazdan yapılan değişiklikleri senkronize eder
           return {
             items: firestoreCartData.items || [],
             total: firestoreCartData.total || 0,
@@ -87,24 +86,44 @@ export function CartProvider({ children }) {
   const calculateTotal = (items) =>
     items.reduce((sum, item) => sum + (item.qty || 0) * (item.price || 0), 0);
 
-  // --- Debounced Firestore Update Function ---
+  // --- Anlık Firestore Update Function (Debounce yok) ---
+  const updateFirestoreImmediately = async (cartStateToSave) => {
+    if (!tableId) return;
+    // Devam eden debounce işlemini iptal et (varsa)
+    if (firestoreUpdateTimeout.current) {
+        clearTimeout(firestoreUpdateTimeout.current);
+        firestoreUpdateTimeout.current = null;
+    }
+    try {
+        console.log(`Writing IMMEDIATE to Firestore: tables/${tableId}`, cartStateToSave);
+        const tableRef = doc(db, "tables", tableId);
+        await setDoc(tableRef, {
+            cart: {
+                items: cartStateToSave.items,
+                total: cartStateToSave.total,
+                note: cartStateToSave.note
+            },
+            updatedAt: serverTimestamp(),
+        }, { merge: true });
+        console.log("Firestore IMMEDIATE update successful.");
+    } catch (e) {
+        console.error("❌ Firestore Cart IMMEDIATE update failed:", e);
+    }
+  };
+
+
+  // --- Debounced Firestore Update Function (Sadece ürün ekleme/çıkarma ve not için) ---
   const scheduleFirestoreUpdate = (cartStateToSave) => {
-    // Önceki zamanlayıcıyı temizle (varsa)
     if (firestoreUpdateTimeout.current) {
       clearTimeout(firestoreUpdateTimeout.current);
     }
-    // Yeni bir zamanlayıcı başlat
     firestoreUpdateTimeout.current = setTimeout(async () => {
       if (!tableId) return;
       try {
         console.log(`Debounced Write to Firestore: tables/${tableId}`, cartStateToSave);
         const tableRef = doc(db, "tables", tableId);
         await setDoc(tableRef, {
-          cart: {
-            items: cartStateToSave.items,
-            total: cartStateToSave.total,
-            note: cartStateToSave.note
-          },
+          cart: { items: cartStateToSave.items, total: cartStateToSave.total, note: cartStateToSave.note },
           updatedAt: serverTimestamp(),
         }, { merge: true });
         console.log("Firestore update successful (debounced).");
@@ -114,10 +133,10 @@ export function CartProvider({ children }) {
     }, 300); // 300ms gecikme
   };
 
-  // --- Cart API Functions (Optimistic UI + Debounced Firestore Write) ---
+  // --- Cart API Functions (Optimistic UI + Debounced/Immediate Firestore Write) ---
 
   const addItem = (product) => {
-    let newState; // Güncellenmiş state'i tutmak için
+    let newState;
     setCart(prevCart => {
       const existingItem = prevCart.items.find((item) => item.id === product.id);
       let newItems;
@@ -159,16 +178,17 @@ export function CartProvider({ children }) {
     }
   };
 
+  // ----- clearCart (GÜNCELLENMİŞ HALİ) -----
   const clearCart = () => {
     console.log("clearCart called.");
     const emptyState = { items: [], total: 0, note: "" };
-    // Önce yerel state'i temizle
+    // 1. Optimistically update local state IMMEDIATELY
     setCart(emptyState);
-    // Sonra Firestore güncellemesini (gecikmeli olarak) zamanla
-    scheduleFirestoreUpdate(emptyState);
+    // 2. Call Firestore update IMMEDIATELY (debounce yok)
+    updateFirestoreImmediately(emptyState); // scheduleFirestoreUpdate yerine bunu kullan
   };
+  // ----- clearCart Bitiş -----
 
-  // Not değişikliği HEMEN yerel state'i günceller VE Firestore güncellemesini zamanlar
   const updateNote = (newNote) => {
       console.log("updateNote called:", newNote);
       let newState;
@@ -182,40 +202,22 @@ export function CartProvider({ children }) {
       }
   };
 
-  // Siparişi gönder (Bu işlem anlık olmalı, debounce YOK)
   const placeOrder = async () => {
     if (!tableId || cart.items.length === 0) return;
-
-    // Devam eden debounce işlemini iptal et, çünkü sipariş veriliyor
-    if (firestoreUpdateTimeout.current) {
-        clearTimeout(firestoreUpdateTimeout.current);
-        firestoreUpdateTimeout.current = null; // Timeout referansını temizle
-    }
-
-    const cartToSubmit = cart; // O anki yerel state'i al
+    if (firestoreUpdateTimeout.current) { clearTimeout(firestoreUpdateTimeout.current); firestoreUpdateTimeout.current = null; }
+    const cartToSubmit = cart;
     console.log("placeOrder called, cart to submit:", cartToSubmit);
-    // Butonları disable etmek için bir state eklenebilir (opsiyonel)
-    // setIsPlacingOrder(true);
     try {
-      await submitOrder({ // submitOrder Firestore'a yazar
-        tableId,
-        items: cartToSubmit.items,
-        total: cartToSubmit.total,
-        note: cartToSubmit.note,
-      });
+      await submitOrder({ tableId, items: cartToSubmit.items, total: cartToSubmit.total, note: cartToSubmit.note });
       alert("✅ Siparişiniz başarıyla alındı ve mutfağa iletildi!");
-      // Sipariş başarılıysa, Firestore'daki sepeti ANINDA temizle
-      // Bu, onSnapshot'ı tetikleyerek yerel state'i de temizleyecek
       const emptyState = { items: [], total: 0, note: "" };
-      const tableRef = doc(db, "tables", tableId);
-      await setDoc(tableRef, { cart: emptyState, updatedAt: serverTimestamp() }, { merge: true });
-      // Yerel state'i de hemen temizleyebiliriz, onSnapshot zaten aynısını yapacak
-      setCart(emptyState);
+      // Firestore'u HEMEN temizle (Bu onSnapshot'ı tetikleyecek)
+      await updateFirestoreImmediately(emptyState);
+      // Yerel state'i de hemen temizleyebiliriz
+      // setCart(emptyState); // İsteğe bağlı, onSnapshot zaten yapacak
     } catch (e) {
       console.error("❌ Order submission error:", e);
       alert("Siparişiniz gönderilemedi. Lütfen tekrar deneyin.");
-    } finally {
-      // setIsPlacingOrder(false);
     }
   };
 
@@ -228,7 +230,7 @@ export function CartProvider({ children }) {
     clearCart,
     placeOrder,
     updateNote,
-  }), [cart, tableId]);
+  }), [cart, tableId]); // Fonksiyonlar artık değişmediği için bağımlılıkta yok
 
   return (
     <CartContext.Provider value={value}>
