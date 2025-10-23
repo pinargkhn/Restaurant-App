@@ -4,11 +4,12 @@ import Menu from "./pages/Menu";
 import Kitchen from "./pages/Kitchen";
 import Waiter from "./pages/Waiter";
 import Login from "./pages/Login";
+import Welcome from "./pages/Welcome"; // 👈 Karşılama ekranı import edildi
 import { CartProvider } from "./context/CartContext";
 import AdminDashboard from "./pages/AdminDashboard";
-import './App.css'; // 👈 GLOBAL STİLLERİ İÇE AKTAR
+import './App.css'; // Global stiller
 
-// 🔹 Rol tabanlı koruma
+// Rol tabanlı koruma
 function PrivateRoute({ children, allowedRole }) {
   const role = localStorage.getItem("role");
   return role === allowedRole ? children : <Navigate to="/login" />;
@@ -18,13 +19,16 @@ function App() {
   return (
     <CartProvider>
       <Routes>
-        {/* 🧾 Müşteri (QR üzerinden masa bağlantılı menü) */}
+        {/* 👇 YENİ: Karşılama Ekranı Rotası */}
+        <Route path="/welcome" element={<Welcome />} />
+
+        {/* Müşteri Menüsü (Ana Rota - QR artık buraya yönlendirmiyor) */}
         <Route path="/" element={<Menu />} />
 
-        {/* 🔐 Giriş ekranı */}
+        {/* Giriş ekranı */}
         <Route path="/login" element={<Login />} />
 
-        {/* 👨‍🍳 Mutfak (sadece kitchen rolü) */}
+        {/* Mutfak */}
         <Route
           path="/kitchen"
           element={
@@ -34,7 +38,7 @@ function App() {
           }
         />
 
-        {/* 🧑‍💼 Garson (sadece waiter rolü) */}
+        {/* Garson */}
         <Route
           path="/waiter"
           element={
@@ -44,7 +48,7 @@ function App() {
           }
         />
 
-        {/* Yönetici Paneli (dashboard + masa & qr yönetimi entegre) */}
+        {/* Yönetici Paneli */}
         <Route
           path="/dashboard"
           element={
@@ -54,7 +58,7 @@ function App() {
           }
         />
 
-        {/* 🔁 Bilinmeyen URL’lerde login’e yönlendirme */}
+        {/* Bilinmeyen URL’lerde login’e yönlendirme */}
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </CartProvider>
