@@ -54,9 +54,7 @@ export default function Welcome() {
       <footer className="landing-footer">
         <p>FİYATLARIMIZA TÜM VERGİLER DAHİLDİR.</p>
         <p>Son fiyat güncellememiz 29.07.2025 tarihinde gerçekleşmiştir.</p>
-        <a href="https://www.instagram.com/happymoonscafe/" /* Değiştirin */ target="_blank" rel="noopener noreferrer" className="footer-link">
-          INSTAGRAM SAYFAMIZA GÖZ ATIN
-        </a>
+        
       </footer>
     </div>
   );
