@@ -2,9 +2,7 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './Welcome.css'; // Stil dosyasını import et
-import logoImage from '../assets/happy_plates_logo.png';
-// Logo dosyanızı projenize ekleyin (örn: src/assets/logo.png)
-// import logo from '../assets/happymoons_logo.png'; // Logo yolunu kendi dosyanıza göre güncelleyin
+import logoImage from '../assets/Happy_plates_logo.png';
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -22,13 +20,35 @@ export default function Welcome() {
     }
   };
 
+  // Diğer butonlar için (şimdilik) boş fonksiyonlar
+  const handleCallWaiter = () => {
+    alert("Garson çağrıldı!");
+    // Buraya garson çağırma API veya WebSocket isteği eklenebilir
+  };
+
+  const handleFeedback = () => {
+    alert("Görüş ve öneri formu açılıyor...");
+    // Buraya bir modal veya başka bir sayfaya yönlendirme eklenebilir
+  };
+
   return (
     <div className="landing-container"> {/* CSS sınıfları landing- olarak kaldı */}
       <header className="landing-header">
         {/* Logoyu buraya ekleyin */}
         <img src={logoImage} alt="Happy Plates Logo" className="landing-logo" />
         
-        <h1 className="landing-slogan">Different Planet in Every Plate</h1>
+        <svg className="landing-slogan-svg" viewBox="0 0 500 100">
+          <defs>
+            <path id="sloganCurve" d="M 0 60 Q 250 100 500 60" />
+          </defs>
+          <text width="500">
+            {/* textPath, metni #sloganCurve id'li yolu izlemeye zorlar */}
+            <textPath href="#sloganCurve" startOffset="50%" textAnchor="middle">
+              Different Planet in Every Plate
+            </textPath>
+          </text>
+        </svg>
+        {/* --- DEĞİŞİKLİK BURADA BİTİYOR --- */}
         {/* Instagram Linki ve İkonu */}
         <a href="https://www.instagram.com/happy_plates_official/" /* Değiştirin */ target="_blank" rel="noopener noreferrer" className="social-link">
           {/* Basit SVG Instagram ikonu */}
@@ -40,10 +60,25 @@ export default function Welcome() {
       </header>
 
       <main className="landing-main">
-        {/* Başlama Butonu */}
-        <button onClick={handleStart} className="start-button">
-          BAŞLAMAK İÇİN TIKLAYIN!
-        </button>
+        
+        {/* Butonları saran yeni container */}
+        <div className="button-container">
+          {/* Başlama Butonu (Ana buton) */}
+          <button onClick={handleStart} className="start-button">
+            BAŞLAMAK İÇİN TIKLAYIN
+          </button>
+          
+          {/* Yeni Buton 1 (İkincil buton) */}
+          <button onClick={handleCallWaiter} className="start-button">
+            Garson Çağır
+          </button>
+          
+          {/* Yeni Buton 2 (İkincil buton) */}
+          <button onClick={handleFeedback} className="start-button">
+            Görüş ve Öneri Bildir
+          </button>
+        </div>
+
         {/* Dil Seçici (Basit Hali) */}
         <div className="language-selector">
           <span>🇹🇷</span>

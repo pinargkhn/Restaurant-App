@@ -1,4 +1,5 @@
 /* src/pages/Welcome.css */
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
 
 .landing-container {
   display: flex;
@@ -16,10 +17,11 @@
 }
 
 .landing-logo {
-  max-width: 250px; /* Logonun boyutunu ayarlayın */
+  width: 1000px;
   height: auto;
   margin: 0 auto 1rem auto;
   display: block;
+  transform: translateY(-30px); /* Logoyu 30px yukarı kaydırır */
 }
 /* Geçici Logo Stili */
 .temp-logo {
@@ -36,14 +38,44 @@
 }
 
 
-.landing-slogan {
-  font-size: 2.5rem; /* Boyutu ayarlayın */
-  font-weight: bold; /* Kalın font */
+/*.landing-slogan {
+  font-size: 2.5rem; 
+  font-weight: bold; 
   margin-bottom: 1rem;
   line-height: 1.2;
-  font-style: italic;
-  /* Özel bir font kullanıyorsanız burada belirtin */
-  /* font-family: 'YourSpecialFont', cursive; */
+  font-family: "Dancing Script", cursive;  
+  transform: translateY(-160px); 
+}
+*/
+
+.landing-slogan-svg {
+  width: 100%;
+  max-width: 600px; /* Genişliği logonuza veya isteğinize göre ayarlayın */
+  height: 100px; /* Yüksekliği ayarlayın, gerekirse artırın */
+  margin: 0 auto 1rem auto; /* Yatayda ortala */
+  
+  /* En ÖNEMLİ KISIM: Orijinal kaydırmanızı koruyoruz */
+  transform: translateY(-350px); 
+  
+  /* SVG'nin taşan kısımlarını görünür yap (opsiyonel) */
+  /* overflow: visible; */ 
+}
+
+/* SVG içindeki metnin stilini belirleme */
+.landing-slogan-svg text {
+  /* Orijinal font stilinizi buraya taşıyın */
+  font-family: "Dancing Script", cursive;
+  font-size: 2.5rem; /* Boyutu ayarlayın (rem veya px) */
+  font-weight: bold;
+  
+  /* Metin rengini CSS değişkeninizden alın */
+  fill: var(--white); 
+}
+
+/* Metnin izlediği yolu görünmez yap (sadece hata ayıklama için stroke: 'white' yapabilirsiniz) */
+.landing-slogan-svg path {
+  fill: none;
+  stroke: none;
 }
 
 .social-link {
@@ -55,6 +87,7 @@
   font-size: 0.9rem;
   opacity: 0.8;
   transition: opacity 0.2s ease;
+  transform: translateY(-70px);
 }
 .social-link:hover {
   opacity: 1;
@@ -72,25 +105,45 @@
   justify-content: center; /* İçeriği dikeyde ortala */
   gap: 1.5rem;
 }
+.button-container {
+  display: flex;
+  flex-direction: column; /* Mobil varsayılan (alt alta) */
+  align-items: center;
+  gap: 1.5rem; /* Butonlar arası boşluk (mobilde) */
+  width: 100%; /* Konteyner genişlesin */
+}
 
+/* --- DEĞİŞİKLİK BURADA --- */
+/* .start-button için stiller birleştirildi */
 .start-button {
+  font-size: 1.2rem;
+  font-weight: bold 800;
+  padding: 1rem 2rem;
+  border: 2px solid var(--white);
+  border-radius: 32px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  width: 90%; /* Mobilde genişliği ayarla */
+  max-width: 300px; /* Mobilde maksimum genişlik */
+  box-sizing: border-box; /* Padding'i genişliğe dahil et */
+  
+  /* --- .primary ve .secondary'den taşınan stiller --- */
   background-color: var(--white);
   color: var(--primary-red);
-  font-size: 1.2rem;
-  font-weight: bold;
-  padding: 1rem 2rem;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  width: 90%; /* Mobilde biraz daha geniş */
-  max-width: 300px; /* Ama çok genişlemesin */
 }
+
+
+
 .start-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+  
+  /* Yorumdaki ("Beyazı hafif karart") niyete göre güncellendi */
+  background-color: #f0f0f0; 
 }
+
+
 
 .language-selector {
   display: flex;
@@ -124,4 +177,21 @@
 }
 .footer-link:hover {
   opacity: 1;
+}
+
+@media (min-width: 768px) {
+  
+  .button-container {
+    flex-direction: row; /* Butonları yan yana diz */
+    justify-content: center; /* Yatayda ortala */
+    gap: 2rem; /* Yan yanayken boşluk */
+    
+    /* Konteynerin genişliğini kısıtla ki butonlar çok ayrılmasın */
+    max-width: 1000px; 
+  }
+
+  .start-button {
+    width: auto; /* PC'de genişlik otomatik olsun */
+    min-width: 200px; /* Minimum genişlik verelim (isteğe bağlı) */
+  }
 }
