@@ -53,7 +53,7 @@
   max-width: 600px; /* Genişliği logonuza veya isteğinize göre ayarlayın */
   height: 100px; /* Yüksekliği ayarlayın, gerekirse artırın */
   margin: 0 auto 1rem auto; /* Yatayda ortala */
-  transform: translateY(-230px); 
+  transform: translateY(-200px); 
 }
 
 /* SVG içindeki metnin stilini belirleme */
