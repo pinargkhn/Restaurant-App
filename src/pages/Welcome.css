@@ -21,6 +21,7 @@
   height: auto;
   margin: 0 auto 1rem auto;
   display: block;
+  margin-bottom: -5%;
 }
 
 
@@ -29,7 +30,7 @@
   max-width: 600px; /* Genişliği logonuza veya isteğinize göre ayarlayın */
   height: 100px; /* Yüksekliği ayarlayın, gerekirse artırın */
   margin: 0 auto 1rem auto; /* Yatayda ortala */ 
-  transform: translateY(-80px);
+  
 }
 
 /* SVG içindeki metnin stilini belirleme */
