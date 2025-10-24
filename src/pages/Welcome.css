@@ -53,13 +53,7 @@
   max-width: 600px; /* Genişliği logonuza veya isteğinize göre ayarlayın */
   height: 100px; /* Yüksekliği ayarlayın, gerekirse artırın */
   margin: 0 auto 1rem auto; /* Yatayda ortala */
-  
-  /* En ÖNEMLİ KISIM: Orijinal kaydırmanızı koruyoruz */
-  transform: translateY(-350px); 
-  
-  /* SVG'nin taşan kısımlarını görünür yap (opsiyonel) */
-  /* overflow: visible; */ 
-  
+  transform: translateY(-230px); 
 }
 
 /* SVG içindeki metnin stilini belirleme */
@@ -182,6 +176,10 @@
 
 @media (min-width: 768px) {
   
+  .landing-slogan-svg {
+    /* Web için daha az ayrık olan eski değeri (veya istediğiniz bir değeri) girin */
+    transform: translateY(-400px); 
+  }
   .button-container {
     flex-direction: row; /* Butonları yan yana diz */
     justify-content: center; /* Yatayda ortala */
