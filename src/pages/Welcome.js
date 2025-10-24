@@ -2,8 +2,7 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './Welcome.css'; // Stil dosyasını import et
-
-import logoImage from '../assets/Happy_plates_logo.png';
+import logoImage from '../assets/logo.png';
 
 export default function Welcome() {
   const navigate = useNavigate();
