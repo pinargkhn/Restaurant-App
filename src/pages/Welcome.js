@@ -108,16 +108,17 @@ export default function Welcome() {
         
         {/* Butonları saran yeni container */}
         <div className="button-container">
-          {/* Başlama Butonu (Ana buton) */}
-          <button onClick={handleStart} className="start-button">
-            BAŞLAMAK İÇİN TIKLAYIN
-          </button>
           
           {/* Yeni Buton 1 (İkincil buton) */}
           <button onClick={handleCallWaiter} className="start-button">
             Garson Çağır
           </button>
-          
+
+          {/* Başlama Butonu (Ana buton) */}
+          <button onClick={handleStart} className="start-button">
+            BAŞLAMAK İÇİN TIKLAYIN
+          </button>
+
           {/* Yeni Buton 2 (İkincil buton) */}
           <button onClick={handleFeedback} className="start-button">
             Görüş ve Öneri Bildir
