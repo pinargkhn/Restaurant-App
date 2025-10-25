@@ -10,14 +10,19 @@
   text-align: center;
   /* padding: 2rem 1rem; (İSTEK ÜZERİNE KALDIRILDI) */
   box-sizing: border-box;
+
+  position: relative; /* Yıldızları bu kapsayıcıya göre konumlandırmak için */
+  overflow: hidden; /* Kenarlardan taşan yıldızların kaydırma çubuğu oluşturmasını engelle */
 }
 
 /* --- YENİ EKLENEN/DEĞİŞEN HEADER STİLLERİ --- */
 .landing-header {
   display: grid;
   width: 100%;
+  height: 50vh;
   justify-content: center;
-  margin-top: 2%; /* (İSTEK ÜZERİNE EKLENDİ) */
+  margin-top: 5vh; 
+  height: 50vh;
 }
 
 .header-item-wrapper {
@@ -30,10 +35,13 @@
 
 .landing-logo {
   width: 250px;
-  height: auto;
+  height: 250px;
   display: block;
   /* margin: 0 auto 1rem auto; (İSTEK ÜZERİNE KALDIRILDI) */
   /* margin-bottom: -5%; (İSTEK ÜZERİNE KALDIRILDI) */
+  opacity: 0; /* Başlangıçta görünmez yap */
+  animation: fadeInUp 0.8s ease-out forwards;
+  /* (Gecikme yok, ilk bu gelecek) */
 }
 
 
@@ -42,6 +50,8 @@
   max-width: 600px; /* Genişliği logonuza veya isteğinize göre ayarlayın */
   height: 100px; /* Yüksekliği ayarlayın, gerekirse artırın */
   margin-top: -90px;
+  opacity: 0; /* Başlangıçta görünmez yap */
+  animation: fadeInUp 0.8s ease-out 0.3s forwards;
 }
 
 /* SVG içindeki metnin stilini belirleme */
@@ -67,6 +77,9 @@
   font-size: 0.9rem;
   opacity: 0.8;
   transition: opacity 0.2s ease;
+  opacity: 0; /* Başlangıçta görünmez yap */
+  animation: fadeInUp 0.8s ease-out 0.6s forwards;
+  /* (Slogan'dan 0.3s sonra gelecek) */
 }
 .social-link:hover {
   opacity: 1;
@@ -90,7 +103,11 @@
   align-items: center;
   gap: 1.5rem; 
   width: 100%; 
-  transition: 0.3s ease; /* transform kaldırıldı */
+  height: 30vh;
+  transition: 0.3s ease;
+  opacity: 0; /* Başlangıçta görünmez yap */
+  animation: fadeInUp 0.8s ease-out 0.9s forwards;
+  /* (Header'daki son öğeden 0.3s sonra gelecek) */
 }
 
 
@@ -139,6 +156,7 @@
   font-size: 0.8rem;
   opacity: 0.7;
   line-height: 1.5;
+  height: 15vh;
 }
 .landing-footer p {
   /* margin: 0.5rem 0; (İSTEK ÜZERİNE KALDIRILDI) */
@@ -169,5 +187,271 @@
   .start-button {
     width: auto; 
     min-width: 200px; 
+  }
+}
+@media (max-width: 768px) {
+   .social-link{
+   margin-top: -50px;
+  }
+  }
+
+  /* src/pages/Welcome.css */
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+
+.landing-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--primary-red); /* Ana kırmızı arka plan (App.css'den) */
+  color: var(--white); /* Beyaz metin */
+  text-align: center;
+  /* padding: 2rem 1rem; (İSTEK ÜZERİNE KALDIRILDI) */
+  box-sizing: border-box;
+}
+
+/* --- YENİ EKLENEN/DEĞİŞEN HEADER STİLLERİ --- */
+.landing-header {
+  display: grid;
+  width: 100%;
+  height: 50vh;
+  justify-content: center;
+  margin-top: 5vh; 
+  height: 50vh;
+}
+
+.header-item-wrapper {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+/* --- DEĞİŞİKLİKLER BİTTİ --- */
+
+
+.landing-logo {
+  width: 250px;
+  height: 250px;
+  display: block;
+  
+  /* --- ANİMASYON EKLENDİ --- */
+  opacity: 0; /* Başlangıçta görünmez yap */
+  animation: fadeInUp 0.8s ease-out forwards;
+  /* (Gecikme yok, ilk bu gelecek) */
+}
+
+
+.landing-slogan-svg {
+  width: 100%;
+  max-width: 600px; /* Genişliği logonuza veya isteğinize göre ayarlayın */
+  height: 100px; /* Yüksekliği ayarlayın, gerekirse artırın */
+  margin-top: -90px;
+  
+  /* --- ANİMASYON EKLENDİ --- */
+  opacity: 0; /* Başlangıçta görünmez yap */
+  animation: fadeInUp 0.8s ease-out 0.3s forwards;
+  /* (Logo'dan 0.3s sonra gelecek) */
+}
+
+/* SVG içindeki metnin stilini belirleme */
+.landing-slogan-svg text {
+  font-family: "Dancing Script", cursive;
+  font-size: 2.0rem; /* Boyutu ayarlayın (rem veya px) */
+  font-weight: bold;
+  fill: var(--white); 
+}
+
+/* Metnin izlediği yolu görünmez yap */
+.landing-slogan-svg path {
+  fill: none;
+  stroke: none;
+}
+
+.social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--white);
+  text-decoration: none;
+  font-size: 0.9rem;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+  
+  /* --- ANİMASYON EKLENDİ --- */
+  opacity: 0; /* Başlangıçta görünmez yap */
+  animation: fadeInUp 0.8s ease-out 0.6s forwards;
+  /* (Slogan'dan 0.3s sonra gelecek) */
+}
+.social-link:hover {
+  opacity: 1;
+}
+.social-link svg {
+  width: 18px;
+  height: 18px;
+}
+
+.landing-main {
+  flex-grow: 1; 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+.button-container {
+  display: flex;
+  flex-direction: column; 
+  align-items: center;
+  gap: 1.5rem; 
+  width: 100%; 
+  height: 30vh;
+  transition: 0.3s ease;
+  
+  /* --- ANİMASYON EKLENDİ --- */
+  opacity: 0; /* Başlangıçta görünmez yap */
+  animation: fadeInUp 0.8s ease-out 0.9s forwards;
+  /* (Header'daki son öğeden 0.3s sonra gelecek) */
+}
+
+
+/* .start-button için stiller birleştirildi */
+.start-button {
+  font-size: 1.2rem;
+  font-weight: bold 800;
+  padding: 1rem 2rem;
+  border: 2px solid var(--white);
+  border-radius: 32px;
+  cursor: pointer;
+  /* transform kaldırıldı */
+  transition: box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  width: 90%; 
+  max-width: 300px; 
+  box-sizing: border-box; 
+  
+  background-color: var(--white);
+  color: var(--primary-red);
+}
+
+
+
+.start-button:hover {
+  /* transform: translateY(-2px); (İSTEK ÜZERİNE KALDIRILDI) */
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+  background-color: #f0f0f0; 
+}
+
+
+
+.language-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+.language-selector span:first-child {
+  font-size: 1.2rem; 
+}
+
+.landing-footer {
+  /* margin-top: 2rem; (İSTEK ÜZERİNE KALDIRILDI) */
+  font-size: 0.8rem;
+  opacity: 0.7;
+  line-height: 1.5;
+  height: 15vh;
+}
+.landing-footer p {
+  /* margin: 0.5rem 0; (İSTEK ÜZERİNE KALDIRILDI) */
+}
+
+.footer-link {
+  display: block;
+  /* margin-top: 1rem; (İSTEK ÜZERİNE KALDIRILDI) */
+  color: var(--white);
+  font-weight: bold;
+  text-decoration: none;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+.footer-link:hover {
+  opacity: 1;
+}
+
+@media (min-width: 768px) {
+  .social-link{
+  }
+  .button-container {
+    flex-direction: row; 
+    justify-content: center; 
+    gap: 2rem; 
+    max-width: 1000px; 
+  }
+  .start-button {
+    width: auto; 
+    min-width: 200px; 
+  }
+}
+@media (max-width: 768px) {
+   .social-link{
+   margin-top: -50px;
+  }
+  
+} /* (Dosyadaki son parantez eksikti, ekledim) */
+
+
+/* === ANİMASYON TANIMLAMASI (Dosyanın en sonuna ekleyin) === */
+
+@keyframes fadeInUp {
+  /* Animasyonun başlangıcı */
+  from {
+    opacity: 0;
+    /* Öğeyi 20px aşağıda başlat (yukarı kayacak) */
+    transform: translateY(20px); 
+  }
+  
+  /* Animasyonun bitişi */
+  to {
+    opacity: 1;
+    /* Öğeyi normal pozisyonuna (0) geri getir */
+    transform: translateY(0);
+  }
+}
+
+.star {
+  position: absolute; /* landing-container'a göre rastgele konumlanacak */
+  width: 3px;
+  height: 3px;
+  background-color:rgb(255, 255, 200);
+  border-radius: 50%; /* Yuvarlak yıldız */
+  
+  /* Parlama efekti için gölge */
+  box-shadow: 0 0 10px 4px rgba(255, 255, 255, 0.9), /* <-- Gölge daha belirgin */
+              0 0 20px 8px rgba(255, 255, 200, 0.5); /* <-- İkinci bir dış gölge */
+  /* Animasyon adı */
+  animation-name: glowStar;
+  animation-iteration-count: infinite; /* Sonsuz döngü */
+  animation-timing-function: ease-in-out; /* Yumuşak geçiş */
+  
+  /* Yıldızların butonlara basmayı engellememesi için */
+  pointer-events: none;
+  
+  /* Başlangıçta soluk olması için (animasyonun 0% haliyle aynı) */
+  opacity: 0.4; 
+}
+
+/* Parıldama animasyonu */
+@keyframes glowStar {
+  0% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1; /* Ortada maksimum parlaklık */
+    transform: scale(1.5); /* Hafifçe büyüsün */
+    box-shadow: 0 0 15px 6px rgba(255, 255, 255, 1), /* <-- En parlak halde gölge */
+                0 0 30px 10px rgba(255, 255, 200, 0.7);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
   }
 }

@@ -3,11 +3,32 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './Welcome.css'; // Stil dosyasını import et
 import logoImage from '../assets/logo.png';
+import { useState, useEffect } from 'react';
 
 export default function Welcome() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tableId = searchParams.get('table'); // URL'den masa ID'sini al
+  
+  // --- YILDIZLAR İÇİN EKLENDİ (1/2) ---
+  const [stars, setStars] = useState([]);
+  const numStars = 30; // Ekranda kaç yıldız olacağı (sayıyı artırıp azaltabilirsiniz)
+  useEffect(() => {
+    // Sayfa yüklendiğinde bir kereliğine rastgele yıldızlar oluştur
+    const newStars = [];
+    for (let i = 0; i < numStars; i++) {
+      newStars.push({
+        top: `${Math.random() * 100}%`, // Dikey konum (% olarak)
+        left: `${Math.random() * 100}%`, // Yatay konum (% olarak)
+        delay: `${Math.random() * 10}s`, // Animasyon gecikmesi (10 saniyeye kadar)
+        duration: `${Math.random() * 3 + 3}s`, // Animasyon süresi (3s ile 6s arası)
+      });
+    }
+    setStars(newStars);
+  }, []); // Boş dizi, bu etkinin sadece bir kez çalışmasını sağlar
+  // --- YILDIZ EKLEMESİ BİTTİ (1/2) ---
+
+
 
   const handleStart = () => {
     // Masa ID'si varsa, onu koruyarak ana menüye (`/`) yönlendir
@@ -33,6 +54,22 @@ export default function Welcome() {
 
   return (
     <div className="landing-container"> {/* CSS sınıfları landing- olarak kaldı */}
+
+    {/* --- YILDIZLAR İÇİN EKLENDİ (2/2) --- */}
+      {/* Oluşturulan yıldızları ekrana bas */}
+      {stars.map((star, index) => (
+        <div
+          key={index}
+          className="star"
+          style={{
+            top: star.top,
+            left: star.left,
+            animationDelay: star.delay,
+            animationDuration: star.duration,
+          }}
+        />
+      ))}
+      {/* --- YILDIZ EKLEMESİ BİTTİ (2/2) --- */}
       
       {/* HEADER: İsteğiniz üzerine güncellendi */}
       <header className="landing-header">
