@@ -117,7 +117,7 @@
 /* .start-button için stiller birleştirildi */
 .start-button {
   font-size: 1.2rem;
-  font-weight: bold 600;
+  font-weight:600;
   padding: 1rem 2rem;
   border: 2px solid var(--white);
   border-radius: 32px;

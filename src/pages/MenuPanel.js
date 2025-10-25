@@ -1,175 +1,385 @@
-// src/pages/TablePanel.js
-import { useEffect, useState } from "react";
-// 👈 serverTimestamp import edildi
+// src/pages/MenuPanel.js
+import { useState, useEffect, useMemo } from "react";
 import {
   db,
   collection,
   onSnapshot,
   doc,
-  setDoc,
+  setDoc, // setDoc yerine updateDoc kullanmak daha iyi olabilir ama orijinal kodda setDoc vardı
   deleteDoc,
-  serverTimestamp
-} from "../lib/firebase"; // serverTimestamp'ın lib/firebase'dan export edildiğini varsayıyoruz
-import { QRCodeCanvas } from "qrcode.react";
-import './TablePanel.css'; // Stil dosyası (varsa)
+  addDoc,
+  getDoc,
+  updateDoc, // updateDoc eklendi
+  query,
+  orderBy,
+  writeBatch,
+  storage, ref, uploadBytes, getDownloadURL, deleteObject // getDownloadURL eklendi
+} from "../lib/firebase"; // writeBatch ve getDownloadURL'nin firebase.js'den export edildiğini varsayıyoruz
+import './MenuPanel.css';
 
-// onBack prop'u AdminDashboard'dan geliyor
-export default function TablePanel({ onBack }) {
-  const [tables, setTables] = useState([]);
-  const [newTableId, setNewTableId] = useState("");
-  const baseUrl = window.location.origin; // Uygulamanın temel URL'si
+// --- CategoryPanel Alt Bileşeni (DEĞİŞİKLİK YOK) ---
+function CategoryPanel({ firestoreCategories }) {
+    const [newCategoryName, setNewCategoryName] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
 
-  // Masaları dinle
-  useEffect(() => {
-    const unsubTables = onSnapshot(collection(db, "tables"), (snap) => {
-      setTables(
-        snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
-          // ID'ye göre numerik sıralama
-          .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
-      );
-    });
-    return () => unsubTables(); // Cleanup
-  }, []);
-
-  // Yeni masa ekle
-  const handleAddTable = async () => {
-    const trimmedId = newTableId.trim(); // Boşlukları temizle
-    if (!trimmedId) return; // Boş ID ekleme
-    // ID'nin geçerli olup olmadığını kontrol et (Firebase kısıtlamaları)
-    if (trimmedId.includes('/') || trimmedId === '.' || trimmedId === '..') {
-        alert("Geçersiz masa ID'si. '/' , '.' veya '..' içeremez.");
-        return;
-    }
-    // Masa zaten var mı kontrolü (isteğe bağlı ama önerilir)
-    if (tables.some(t => t.id === trimmedId)) {
-        alert(`'${trimmedId}' adlı masa zaten mevcut!`);
-        return;
-    }
-
-    const ref = doc(db, "tables", trimmedId);
-    try {
-        // Yeni masa için başlangıç verisi (boş sepet ve oluşturma zamanı)
-        await setDoc(ref, {
-             createdAt: serverTimestamp(), // 👈 serverTimestamp kullanıldı
-             cart: { items: [], total: 0, note: "" }
-        }, { merge: true }); // Merge true, varolan dokümanın üzerine yazmayı engeller (genelde gereksiz ama zararsız)
-        setNewTableId(""); // Input'u temizle
-    } catch (error) {
-        console.error("Masa ekleme hatası:", error);
-        alert("Masa eklenirken bir hata oluştu.");
-    }
-  };
-
-  // Masa sil
-  const handleDeleteTable = async (id) => {
-    if (window.confirm(`'${id}' adlı masayı silmek istediğinizden emin misiniz? Bu masaya ait tüm sipariş verileri kaybolabilir!`)) {
-      try {
-        await deleteDoc(doc(db, "tables", id));
-        alert(`Masa '${id}' başarıyla silindi.`);
-      } catch (error) {
-         console.error("Masa silme hatası:", error);
-         alert("Masa silinirken bir hata oluştu.");
-      }
-    }
-  };
-
-  // QR İndirme Fonksiyonu
-  const downloadQR = (e, id) => {
-    // En yakın .table-card içindeki canvas'ı bul
-    const canvas = e.target.closest('.table-card')?.querySelector('canvas');
-    if (canvas) {
-        try {
-            // Canvas içeriğini PNG data URL'ine çevir
-            const pngUrl = canvas.toDataURL("image/png");
-            // Geçici bir link elementi oluştur
-            const link = document.createElement("a");
-            link.href = pngUrl;
-            link.download = `QR_${id}.png`; // İndirilecek dosya adı
-            // Linki DOM'a ekle, tıkla ve kaldır
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } catch (error) {
-            console.error("QR indirme hatası:", error);
-            alert("QR kod indirilirken bir hata oluştu.");
+    const handleAddCategory = async (e) => {
+        e.preventDefault();
+        const name = newCategoryName.trim();
+        if (!name) return;
+        if (firestoreCategories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+            alert("Bu kategori zaten mevcut!"); return;
         }
-    } else {
-        console.error("QR indirme hatası: Canvas elementi bulunamadı.");
-        alert("QR kod indirilemedi.");
+        setIsSaving(true);
+        try {
+            const categoriesRef = collection(db, "categories");
+            await addDoc(categoriesRef, {
+                name: name,
+                order: firestoreCategories.length > 0 ? Math.max(...firestoreCategories.map(c => c.order || 0)) + 1 : 1,
+            });
+            setNewCategoryName("");
+            alert(`✅ Yeni kategori '${name}' başarıyla eklendi.`);
+        } catch (error) { console.error("🔥 Kategori ekleme hatası:", error); alert("❌ Kategori eklenemedi."); }
+        finally { setIsSaving(false); }
+    };
+
+    const handleDeleteCategory = async (id, name) => {
+        if (!window.confirm(`⚠️ ${name} kategorisini silmek istediğinizden emin misiniz?`)) return;
+        try { await deleteDoc(doc(db, "categories", id)); alert(`🗑️ Kategori '${name}' silindi.`); }
+        catch (error) { console.error("🔥 Kategori silme hatası:", error); alert("❌ Kategori silinemedi."); }
+    };
+
+    const handleReorder = async (id, direction) => {
+        const index = firestoreCategories.findIndex(c => c.id === id);
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex < 0 || newIndex >= firestoreCategories.length) return;
+        const newOrder = [...firestoreCategories];
+        const [movedCategory] = newOrder.splice(index, 1);
+        newOrder.splice(newIndex, 0, movedCategory);
+        setIsSaving(true);
+        try { await Promise.all(newOrder.map((cat, idx) => updateDoc(doc(db, "categories", cat.id), { order: idx + 1 }))); }
+        catch (error) { console.error("🔥 Sıralama hatası:", error); alert("❌ Sıralama güncellenemedi."); }
+        finally { setIsSaving(false); }
+    };
+
+    return (
+        <div className="form-container category-panel-container">
+             <h4 className="form-title">Kategori Ekle</h4>
+            <form onSubmit={handleAddCategory} className="category-add-form">
+                <input
+                    type="text"
+                    placeholder="Yeni Kategori Adı (örn: Spesiyaller)"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    className="form-input"
+                    disabled={isSaving}
+                    required
+                />
+                <button type="submit" className="button button-green" disabled={isSaving || newCategoryName.trim() === ""}>
+                    {isSaving ? "Ekleniyor..." : "Ekle"}
+                </button>
+            </form>
+             <h4 className="section-title">Mevcut Kategoriler ({firestoreCategories.length})</h4>
+            <p className="panel-note-small">Kategoriler sırası, menüde görünecek sırayı belirler.</p>
+            <ul className="category-list">
+                {firestoreCategories.map((cat, index) => (
+                    <li key={cat.id} className="category-list-item">
+                        <span className="category-name">{index + 1}. {cat.name}</span>
+                        <div className="category-actions">
+                            <button onClick={() => handleReorder(cat.id, 'up')} disabled={isSaving || index === 0} className="button button-icon">↑</button>
+                            <button onClick={() => handleReorder(cat.id, 'down')} disabled={isSaving || index === firestoreCategories.length - 1} className="button button-icon">↓</button>
+                            <button onClick={() => handleDeleteCategory(cat.id, cat.name)} className="button button-danger" disabled={isSaving}>Sil</button>
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+// --- CategoryPanel Bitiş ---
+
+
+// -------------------------------------------------------------------
+// 🔹 Ana MenuPanel Bileşeni (GÜNCELLENDİ)
+// -------------------------------------------------------------------
+export default function MenuPanel({ onBack }) {
+  const [activeTab, setActiveTab] = useState("products");
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [newProduct, setNewProduct] = useState({
+    name: "", price: "", category: "", imageUrl: "", categoryOrder: 0
+  });
+  const [editingId, setEditingId] = useState(null);
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
+
+  // Firestore Dinleme
+  useEffect(() => {
+    const categoriesQuery = query(collection(db, "categories"), orderBy("order", "asc"));
+    const unsubCategories = onSnapshot(categoriesQuery, (snap) => {
+        const fetchedCategories = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setCategories(fetchedCategories);
+        setNewProduct(prev => {
+            if (!prev.category && fetchedCategories.length > 0) {
+                return { ...prev, category: fetchedCategories[0].name };
+            }
+            if (editingId && !fetchedCategories.some(c => c.name === prev.category) && fetchedCategories.length > 0) {
+                 return { ...prev, category: fetchedCategories[0].name };
+            }
+            return prev;
+        });
+    });
+    const unsubProducts = onSnapshot(collection(db, "products"), (snap) => {
+      setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsubProducts(); unsubCategories(); };
+  }, [editingId]);
+
+  const uniqueCategories = useMemo(() => categories.map(c => c.name), [categories]);
+
+  const productsGroupedByCategory = useMemo(() => {
+    const grouped = {};
+    categories.forEach(cat => { grouped[cat.name] = []; });
+    products.forEach(p => {
+        const catName = p.category || "Diğer";
+        if (!grouped[catName]) grouped[catName] = [];
+        grouped[catName].push(p);
+    });
+    Object.values(grouped).forEach(group => group.sort((a,b) => (a.categoryOrder || 0) - (b.categoryOrder || 0)));
+    return grouped;
+  }, [products, categories]);
+
+  const deleteOldImage = async (url) => {
+      if (!url || !url.includes("firebasestorage")) return;
+      try {
+          // URL'den dosya yolunu çıkar (bucket adı olmadan)
+          const filePath = decodeURIComponent(url.split("/o/")[1].split("?")[0]);
+          const imageRef = ref(storage, filePath);
+          await deleteObject(imageRef);
+          console.log("Eski görsel başarıyla silindi:", filePath);
+      } catch (error) {
+          // Dosya zaten yoksa (not-found hatası) uyarı verme
+          if (error.code !== 'storage/object-not-found') {
+             console.warn("Eski görsel silinemedi:", error);
+          }
+      }
+  };
+
+  // --- CRUD İşlemleri (handleSave GÜNCELLENDİ) ---
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!newProduct.name || !newProduct.price || !newProduct.category) return alert("Alanları doldurun");
+    if (!uniqueCategories.includes(newProduct.category)) return alert("Geçersiz kategori");
+
+    setUploading(true);
+    let finalImageUrl = newProduct.imageUrl;
+    let oldImageUrl = "";
+
+    try {
+      if (editingId) {
+        const docSnap = await getDoc(doc(db, "products", editingId));
+        oldImageUrl = docSnap.data()?.imageUrl;
+      }
+
+      // --- YENİ YÜKLEME MANTIĞI ---
+      if (file) {
+        console.log("Yeni dosya yükleniyor...");
+        const filePath = `products/${newProduct.name}_${Date.now()}_${file.name}`;
+        const storageRef = ref(storage, filePath); // Storage referansı oluştur
+
+        console.log("Yükleme referansı:", storageRef);
+        const snapshot = await uploadBytes(storageRef, file); // Dosyayı yükle
+        console.log('Dosya yüklendi:', snapshot);
+
+        finalImageUrl = await getDownloadURL(snapshot.ref); // Yüklenen dosyanın URL'sini al
+        console.log('Alınan URL:', finalImageUrl);
+
+        if (editingId && oldImageUrl) {
+          console.log("Eski görsel siliniyor:", oldImageUrl);
+          await deleteOldImage(oldImageUrl); // Eski görseli sil
+        }
+      }
+      // --- YENİ YÜKLEME MANTIĞI BİTİŞ ---
+
+      let finalCategoryOrder = newProduct.categoryOrder;
+      if (!editingId || typeof finalCategoryOrder !== 'number' || finalCategoryOrder === 0) { // categoryOrder 0 ise de yeniden hesapla
+           const productsInCategory = products.filter(p => p.category === newProduct.category && p.id !== editingId); // Kendisi hariç
+           finalCategoryOrder = productsInCategory.length > 0
+                ? Math.max(0, ...productsInCategory.map(p => p.categoryOrder || 0)) + 1
+                : 1;
+      }
+
+      const productData = {
+        name: newProduct.name,
+        price: Number(newProduct.price),
+        category: newProduct.category,
+        imageUrl: finalImageUrl || "",
+        categoryOrder: finalCategoryOrder,
+      };
+
+      console.log("Firestore'a kaydedilecek veri:", productData);
+
+      if (editingId) {
+        await updateDoc(doc(db, "products", editingId), productData);
+        alert(`✅ Ürün güncellendi.`);
+        setEditingId(null);
+      } else {
+        await addDoc(collection(db, "products"), productData);
+        alert(`✅ Yeni ürün eklendi.`);
+      }
+
+      setNewProduct({ name: "", price: "", category: uniqueCategories[0] || "", imageUrl: "", categoryOrder: 0 });
+      setFile(null);
+
+    } catch (error) {
+      console.error("🔥 Ürün kaydetme/yükleme hatası:", error);
+      alert(`❌ İşlem başarısız oldu. Hata: ${error.message}`);
+    } finally {
+      console.log("Yükleme durumu false yapılıyor.");
+      setUploading(false); // Her durumda yükleme durumunu false yap
     }
   };
 
+  const handleEdit = (product) => {
+    setEditingId(product.id);
+    setNewProduct({
+      name: product.name,
+      price: product.price.toString(),
+      category: product.category,
+      imageUrl: product.imageUrl || "",
+      categoryOrder: product.categoryOrder || 0,
+    });
+    setFile(null); // Düzenlemeye başlarken dosya seçimini temizle
+  };
 
+  const handleDelete = async (id, name, imageUrl) => {
+    if (window.confirm(`${name} adlı ürünü silmek istediğinizden emin misiniz?`)) {
+      try {
+        await deleteDoc(doc(db, "products", id));
+        if (imageUrl) {
+            await deleteOldImage(imageUrl);
+        }
+        alert(`🗑️ ${name} silindi.`);
+        // Eğer silinen ürün düzenleniyorsa, formu temizle
+        if (editingId === id) {
+            setEditingId(null);
+            setNewProduct({ name: "", price: "", category: uniqueCategories[0] || "", imageUrl: "", categoryOrder: 0 });
+            setFile(null);
+        }
+      } catch (error) { console.error("🔥 Ürün silme hatası:", error); alert("❌ Ürün silinemedi."); }
+    }
+  };
+
+  const handleProductReorder = async (categoryName, productId, direction) => {
+      const productsInCategory = productsGroupedByCategory[categoryName] || [];
+      const index = productsInCategory.findIndex(p => p.id === productId);
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= productsInCategory.length) return;
+
+      setIsReordering(true);
+      try {
+          const reorderedProducts = [...productsInCategory];
+          const [movedProduct] = reorderedProducts.splice(index, 1);
+          reorderedProducts.splice(newIndex, 0, movedProduct);
+          const batch = writeBatch(db);
+          reorderedProducts.forEach((product, idx) => {
+              batch.update(doc(db, "products", product.id), { categoryOrder: idx + 1 });
+          });
+          await batch.commit();
+      } catch (error) { console.error("🔥 Ürün sıralama hatası:", error); alert("❌ Ürün sıralaması güncellenemedi."); }
+      finally { setIsReordering(false); }
+  };
+
+  // Render
   return (
-    // admin-subpanel-container global stili kullanılıyor
     <div className="admin-subpanel-container">
-      {/* Başlık ve Geri Butonu */}
       <div className="subpanel-header">
-        <h2 className="subpanel-title">🪑 Masa & QR Yönetim Paneli</h2>
-        <button
-          onClick={onBack} // AdminDashboard'a geri dön
-          className="button button-secondary" // Global stil
-        >
-          ← Ana Panele Dön
-        </button>
+        <h2 className="subpanel-title">🍔 Menü Yönetim Paneli</h2>
+        <button onClick={onBack} className="button button-secondary"> ← Ana Panele Dön </button>
+      </div>
+      <div className="tab-nav">
+         <button onClick={() => setActiveTab("products")} className={`tab-button ${activeTab === "products" ? "active" : ""}`}> Ürünler </button>
+         <button onClick={() => setActiveTab("categories")} className={`tab-button ${activeTab === "categories" ? "active" : ""}`}> Kategoriler ({categories.length}) </button>
       </div>
 
-      {/* Masa Ekleme Formu */}
-      <div className="add-table-form">
-        <input
-          type="text"
-          value={newTableId}
-          onChange={(e) => setNewTableId(e.target.value)}
-          placeholder="Yeni Masa ID (örn: masa_5 veya A1)"
-          className="form-input" // Global stil
-        />
-        <button
-          onClick={handleAddTable}
-          className="button button-green" // Global stil
-        >
-          Masa Ekle
-        </button>
-      </div>
+      {activeTab === "products" && (
+        <>
+          {/* Ürün Ekle/Düzenle Formu */}
+          <div className="form-container product-form-container">
+             <h3 className="form-title">{editingId ? "✏️ Ürün Düzenle" : "➕ Yeni Ürün Ekle"}</h3>
+             <form onSubmit={handleSave} className="product-form">
+                 <input type="text" placeholder="Ürün Adı" value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} className="form-input" disabled={uploading} required/>
+                 <input type="number" placeholder="Fiyat (₺)" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} className="form-input" disabled={uploading} required step="0.01"/>
+                 <select value={newProduct.category} onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} className="form-select" disabled={uploading || categories.length === 0} required>
+                     {categories.length === 0 ? <option value="" disabled>Önce kategori ekleyin</option> : uniqueCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                 </select>
+                 <div className="form-input-file-wrapper">
+                     <label className="form-label-inline">Görsel:</label>
+                     <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files[0])} disabled={uploading} />
+                 </div>
+                 <div className="form-actions">
+                     <button type="submit" className={`button ${editingId ? "button-blue" : "button-green"}`} disabled={uploading || !newProduct.name || !newProduct.price || !newProduct.category}>
+                         {uploading ? 'İşleniyor...' : editingId ? "Değişiklikleri Kaydet" : "Yeni Ürün Ekle"}
+                     </button>
+                     {editingId && (
+                         <button type="button" onClick={() => { setEditingId(null); setNewProduct({ name: "", price: "", category: uniqueCategories[0] || "", imageUrl: "", categoryOrder: 0 }); setFile(null); }} className="button button-secondary" disabled={uploading}>
+                             İptal
+                         </button>
+                     )}
+                 </div>
+                 {editingId && newProduct.imageUrl && !file && ( // Yeni dosya seçilmediyse mevcut görseli göster
+                     <div className="image-preview-wrapper">
+                         <p className="image-preview-label">Mevcut Görsel:</p>
+                         <img src={newProduct.imageUrl} alt="Mevcut" className="image-preview" />
+                     </div>
+                 )}
+                 {file && ( // Yeni dosya seçildiyse önizlemesini göster
+                     <div className="image-preview-wrapper">
+                         <p className="image-preview-label">Yeni Görsel Önizleme:</p>
+                         <img src={URL.createObjectURL(file)} alt="Önizleme" className="image-preview" />
+                     </div>
+                 )}
+             </form>
+          </div>
 
-      {/* Masa Grid'i */}
-      <div className="table-grid">
-        {tables.map((t) => {
-          // QR KODU URL'Sİ /welcome sayfasına yönlendiriyor
-          const qrUrl = `${baseUrl}/welcome?table=${t.id}`;
-          return (
-            <div
-              key={t.id}
-              className="table-card" // TablePanel.css stili
-            >
-              <h3 className="table-card-title">Masa: {t.id}</h3>
-              {/* QR Kodu */}
-              <QRCodeCanvas value={qrUrl} size={140} level={"H"} />
-              <p className="table-card-url">{qrUrl}</p>
-
-              {/* Butonlar */}
-              <div className="table-card-actions">
-                <button
-                  onClick={(e) => downloadQR(e, t.id)}
-                  className="button button-blue-outline" // Global stil
-                >
-                  QR İndir
-                </button>
-                <button
-                  onClick={() => handleDeleteTable(t.id)}
-                  className="button button-danger" // Global stil
-                >
-                  Sil
-                </button>
-              </div>
+          {/* Kategorilere Göre Gruplanmış Ürün Listesi */}
+          <h3 className="section-title">Tüm Menü Ürünleri (Kategoriye Göre Sıralı)</h3>
+          {Object.entries(productsGroupedByCategory).map(([categoryName, categoryProducts]) => (
+            <div key={categoryName} className="category-group">
+                <h4 className="category-group-title">{categoryName} ({categoryProducts.length})</h4>
+                {categoryProducts.length === 0 ? (
+                    <p className="empty-text-small">Bu kategoride ürün yok.</p>
+                ) : (
+                    <div className="product-list">
+                        {categoryProducts.map((p, index) => (
+                          <div key={p.id} className="product-list-item">
+                            <div className="product-info">
+                                {p.imageUrl && <img src={p.imageUrl} alt={p.name} className="product-item-image" />}
+                                <div>
+                                    <span className="product-item-name">{index + 1}. {p.name}</span>
+                                    <span className="product-item-details">{p.price} ₺</span>
+                                </div>
+                            </div>
+                            <div className="product-actions">
+                              <button onClick={() => handleProductReorder(categoryName, p.id, 'up')} disabled={isReordering || index === 0} className="button button-icon" title="Yukarı Taşı"> ↑ </button>
+                              <button onClick={() => handleProductReorder(categoryName, p.id, 'down')} disabled={isReordering || index === categoryProducts.length - 1} className="button button-icon" title="Aşağı Taşı"> ↓ </button>
+                              <button onClick={() => handleEdit(p)} className="button button-yellow-outline" disabled={isReordering}> Düzenle </button>
+                              <button onClick={() => handleDelete(p.id, p.name, p.imageUrl)} className="button button-danger-outline" disabled={isReordering}> Sil </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                )}
             </div>
-          );
-        })}
-      </div>
+          ))}
+          {!products.length && !categories.length && (
+              <p className="empty-text">Henüz menüye ürün veya kategori eklenmemiş.</p>
+          )}
+        </>
+      )}
 
-      {/* Masa Yoksa */}
-      {!tables.length && (
-        <p className="empty-text">Henüz masa eklenmemiş.</p> // Global stil
+      {activeTab === "categories" && (
+        <CategoryPanel firestoreCategories={categories} />
       )}
     </div>
   );
