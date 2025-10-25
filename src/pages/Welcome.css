@@ -17,7 +17,7 @@
   display: grid;
   width: 100%;
   justify-content: center;
-  margin-top: 5%; /* (İSTEK ÜZERİNE EKLENDİ) */
+  margin-top: 2%; /* (İSTEK ÜZERİNE EKLENDİ) */
 }
 
 .header-item-wrapper {
