@@ -21,7 +21,7 @@ export default function Welcome() {
         top: `${Math.random() * 100}%`, // Dikey konum (% olarak)
         left: `${Math.random() * 100}%`, // Yatay konum (% olarak)
         delay: `${Math.random() * 10}s`, // Animasyon gecikmesi (10 saniyeye kadar)
-        duration: `${Math.random() * 3 + 3}s`, // Animasyon süresi (3s ile 6s arası)
+        duration: `${Math.random() * 2 + 2}s`, // Animasyon süresi (3s ile 6s arası)
       });
     }
     setStars(newStars);
