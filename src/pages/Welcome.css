@@ -8,20 +8,32 @@
   background-color: var(--primary-red); /* Ana kırmızı arka plan (App.css'den) */
   color: var(--white); /* Beyaz metin */
   text-align: center;
-  padding: 2rem 1rem;
+  /* padding: 2rem 1rem; (İSTEK ÜZERİNE KALDIRILDI) */
   box-sizing: border-box;
 }
 
+/* --- YENİ EKLENEN/DEĞİŞEN HEADER STİLLERİ --- */
 .landing-header {
-  margin-bottom: 2rem;
+  display: grid;
+  width: 100%;
+  justify-content: center;
+  margin-top: 5%; /* (İSTEK ÜZERİNE EKLENDİ) */
 }
+
+.header-item-wrapper {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+/* --- DEĞİŞİKLİKLER BİTTİ --- */
+
 
 .landing-logo {
   width: 250px;
   height: auto;
-  margin: 0 auto 1rem auto;
   display: block;
-  margin-bottom: -5%;
+  /* margin: 0 auto 1rem auto; (İSTEK ÜZERİNE KALDIRILDI) */
+  /* margin-bottom: -5%; (İSTEK ÜZERİNE KALDIRILDI) */
 }
 
 
@@ -29,22 +41,18 @@
   width: 100%;
   max-width: 600px; /* Genişliği logonuza veya isteğinize göre ayarlayın */
   height: 100px; /* Yüksekliği ayarlayın, gerekirse artırın */
-  margin: 0 auto 1rem auto; /* Yatayda ortala */ 
-  
+  margin-top: -90px;
 }
 
 /* SVG içindeki metnin stilini belirleme */
 .landing-slogan-svg text {
-  /* Orijinal font stilinizi buraya taşıyın */
   font-family: "Dancing Script", cursive;
-  font-size: 2.5rem; /* Boyutu ayarlayın (rem veya px) */
+  font-size: 2.0rem; /* Boyutu ayarlayın (rem veya px) */
   font-weight: bold;
-  
-  /* Metin rengini CSS değişkeninizden alın */
   fill: var(--white); 
 }
 
-/* Metnin izlediği yolu görünmez yap (sadece hata ayıklama için stroke: 'white' yapabilirsiniz) */
+/* Metnin izlediği yolu görünmez yap */
 .landing-slogan-svg path {
   fill: none;
   stroke: none;
@@ -69,20 +77,20 @@
 }
 
 .landing-main {
-  flex-grow: 1; /* Ortadaki içeriği aşağı itmek için */
+  flex-grow: 1; 
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center; /* İçeriği dikeyde ortala */
+  justify-content: center;
   gap: 1.5rem;
 }
 .button-container {
   display: flex;
-  flex-direction: column; /* Mobil varsayılan (alt alta) */
+  flex-direction: column; 
   align-items: center;
-  gap: 1.5rem; /* Butonlar arası boşluk (mobilde) */
-  width: 100%; /* Konteyner genişlesin */
-  transition: transform 0.3s ease;
+  gap: 1.5rem; 
+  width: 100%; 
+  transition: 0.3s ease; /* transform kaldırıldı */
 }
 
 
@@ -94,13 +102,13 @@
   border: 2px solid var(--white);
   border-radius: 32px;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  /* transform kaldırıldı */
+  transition: box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  width: 90%; /* Mobilde genişliği ayarla */
-  max-width: 300px; /* Mobilde maksimum genişlik */
-  box-sizing: border-box; /* Padding'i genişliğe dahil et */
+  width: 90%; 
+  max-width: 300px; 
+  box-sizing: border-box; 
   
-  /* --- .primary ve .secondary'den taşınan stiller --- */
   background-color: var(--white);
   color: var(--primary-red);
 }
@@ -108,10 +116,8 @@
 
 
 .start-button:hover {
-  transform: translateY(-2px);
+  /* transform: translateY(-2px); (İSTEK ÜZERİNE KALDIRILDI) */
   box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
-  
-  /* Yorumdaki ("Beyazı hafif karart") niyete göre güncellendi */
   background-color: #f0f0f0; 
 }
 
@@ -125,22 +131,22 @@
   opacity: 0.9;
 }
 .language-selector span:first-child {
-  font-size: 1.2rem; /* Bayrak emojisi için */
+  font-size: 1.2rem; 
 }
 
 .landing-footer {
-  margin-top: 2rem;
+  /* margin-top: 2rem; (İSTEK ÜZERİNE KALDIRILDI) */
   font-size: 0.8rem;
   opacity: 0.7;
   line-height: 1.5;
 }
 .landing-footer p {
-  margin: 0.5rem 0;
+  /* margin: 0.5rem 0; (İSTEK ÜZERİNE KALDIRILDI) */
 }
 
 .footer-link {
   display: block;
-  margin-top: 1rem;
+  /* margin-top: 1rem; (İSTEK ÜZERİNE KALDIRILDI) */
   color: var(--white);
   font-weight: bold;
   text-decoration: none;
@@ -155,14 +161,13 @@
   .social-link{
   }
   .button-container {
-    flex-direction: row; /* Butonları yan yana diz */
-    justify-content: center; /* Yatayda ortala */
-    gap: 2rem; /* Yan yanayken boşluk */
-    /* Konteynerin genişliğini kısıtla ki butonlar çok ayrılmasın */
+    flex-direction: row; 
+    justify-content: center; 
+    gap: 2rem; 
     max-width: 1000px; 
   }
   .start-button {
-    width: auto; /* PC'de genişlik otomatik olsun */
-    min-width: 200px; /* Minimum genişlik verelim (isteğe bağlı) */
+    width: auto; 
+    min-width: 200px; 
   }
 }
